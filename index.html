@@ -246,26 +246,26 @@ function G4Investimoveis(){
   useEffect(()=>{
     setSyncStatus('Conectando ao Firebase...');
     
-    // One-time migration: wipe old data with wrong IDs and re-save
-    const migrate=async()=>{
+    // Check if app was ever initialized (flag stored in Firestore, shared across all users)
+    const initApp=async()=>{
       try{
-        const migrated=localStorage.getItem('g4_migrated_v3');
-        if(migrated)return false;
-        setSyncStatus('Migrando dados...');
-        for(const col of ['clientes','tarefas','contratos']){
-          const snap=await db.collection(col).get();
-          if(!snap.empty){const b=db.batch();snap.docs.forEach(d=>b.delete(d.ref));await b.commit();}
+        const flagDoc=await db.collection('_config').doc('init').get();
+        if(!flagDoc.exists){
+          // First time ever: wipe any old data and save initial data
+          setSyncStatus('Inicializando banco de dados...');
+          for(const col of ['clientes','tarefas','contratos']){
+            const snap=await db.collection(col).get();
+            if(!snap.empty){const b=db.batch();snap.docs.forEach(d=>b.delete(d.ref));await b.commit();}
+          }
+          await fsBulk('clientes',dadosIniciaisClientes);
+          await fsBulk('tarefas',dadosIniciaisTarefas);
+          await fsBulk('contratos',dadosIniciaisContratos);
+          await db.collection('_config').doc('init').set({initialized:true,date:new Date().toISOString()});
         }
-        await fsBulk('clientes',dadosIniciaisClientes);
-        await fsBulk('tarefas',dadosIniciaisTarefas);
-        await fsBulk('contratos',dadosIniciaisContratos);
-        localStorage.setItem('g4_migrated_v3','true');
-        setSyncStatus('✓ Migração concluída');
-        return true;
-      }catch(e){console.error('Erro migração:',e);return false;}
+      }catch(e){console.error('Erro init:',e);}
     };
     
-    migrate().then(()=>{
+    initApp().then(()=>{
     let initCount=0;
     const checkReady=()=>{initCount++;if(initCount>=3){loadedRef.current=true;setLoading(false);setSyncStatus('✓ Conectado em tempo real');}};
     
