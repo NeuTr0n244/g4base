@@ -273,11 +273,37 @@ function G4Investimoveis(){
   const prevTarefas=React.useRef(null);
   const prevContratos=React.useRef(null);
 
+  const syncCollection=async(col,prev,current)=>{
+    try{
+      setSyncStatus('Salvando...');
+      // Find deleted items
+      if(prev){
+        const currentIds=new Set(current.map(i=>String(i.id)));
+        const deleted=prev.filter(i=>!currentIds.has(String(i.id)));
+        for(const item of deleted){
+          await db.collection(col).doc(String(item.id)).delete();
+        }
+      }
+      // Save current items
+      if(current.length>0){
+        const batch=db.batch();
+        current.forEach(item=>{
+          const clean={...item};delete clean._docId;
+          batch.set(db.collection(col).doc(String(item.id)),clean);
+        });
+        await batch.commit();
+      }
+      setSyncStatus('✓ Salvo');
+    }catch(e){
+      console.error('Erro sync '+col,e);
+      setSyncStatus('❌ Erro: '+e.message);
+    }
+  };
+
   useEffect(()=>{
     if(!loadedRef.current)return;
     if(prevClientes.current!==null&&JSON.stringify(prevClientes.current)!==JSON.stringify(clientes)){
-      setSyncStatus('Salvando clientes...');
-      fsSaveAll('clientes',clientes).then(()=>setSyncStatus('✓ Salvo'));
+      syncCollection('clientes',prevClientes.current,clientes);
     }
     prevClientes.current=clientes;
   },[clientes]);
@@ -285,8 +311,7 @@ function G4Investimoveis(){
   useEffect(()=>{
     if(!loadedRef.current)return;
     if(prevTarefas.current!==null&&JSON.stringify(prevTarefas.current)!==JSON.stringify(tarefas)){
-      setSyncStatus('Salvando tarefas...');
-      fsSaveAll('tarefas',tarefas).then(()=>setSyncStatus('✓ Salvo'));
+      syncCollection('tarefas',prevTarefas.current,tarefas);
     }
     prevTarefas.current=tarefas;
   },[tarefas]);
@@ -294,8 +319,7 @@ function G4Investimoveis(){
   useEffect(()=>{
     if(!loadedRef.current)return;
     if(prevContratos.current!==null&&JSON.stringify(prevContratos.current)!==JSON.stringify(contratos)){
-      setSyncStatus('Salvando contratos...');
-      fsSaveAll('contratos',contratos).then(()=>setSyncStatus('✓ Salvo'));
+      syncCollection('contratos',prevContratos.current,contratos);
     }
     prevContratos.current=contratos;
   },[contratos]);
