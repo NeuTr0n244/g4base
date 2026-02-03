@@ -187,6 +187,7 @@ function G4Investimoveis(){
   const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false});
   const[diaSelecionado,setDiaSelecionado]=useState(null);
   const[showNotificacoes,setShowNotificacoes]=useState(false);
+  const[notifsVistas,setNotifsVistas]=useState(0);
 
   // CONTRATOS
   const[contratos,setContratos]=useState([]);
@@ -266,6 +267,11 @@ function G4Investimoveis(){
     };
     
     initApp().then(()=>{
+    // Carregar notificacoes vistas do Firestore
+    db.collection('_config').doc('notifsVistas').get().then(doc=>{
+      if(doc.exists)setNotifsVistas(doc.data().count||0);
+    }).catch(e=>console.error('Erro carregar notifs:',e));
+    
     let initCount=0;
     const checkReady=()=>{initCount++;if(initCount>=3){loadedRef.current=true;setLoading(false);setSyncStatus('✓ Conectado em tempo real');}};
     
@@ -405,9 +411,15 @@ function G4Investimoveis(){
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <button onClick={()=>setShowNotificacoes(!showNotificacoes)} className="relative p-2.5 text-gray-400 hover:text-white transition-colors">
+              <button onClick={async()=>{
+                if(!showNotificacoes){
+                  setNotifsVistas(totalNotifs);
+                  try{await db.collection('_config').doc('notifsVistas').set({count:totalNotifs});}catch(e){console.error('Erro salvar notifs:',e);}
+                }
+                setShowNotificacoes(!showNotificacoes);
+              }} className="relative p-2.5 text-gray-400 hover:text-white transition-colors">
                 <Icons.Bell/>
-                {totalNotifs>0&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
+                {totalNotifs>0&&totalNotifs!==notifsVistas&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
               </button>
               {showNotificacoes&&(
                 <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
