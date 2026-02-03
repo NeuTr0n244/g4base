@@ -197,7 +197,9 @@ function G4Investimoveis(){
   const[showGerador,setShowGerador]=useState(false);
   const[showPreview,setShowPreview]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
-    genero:'feminino',nome:'',nacionalidade:'brasileira',estadoCivil:'',profissao:'',rg:'',cpf:'',
+    genero:'feminino',nome:'',nacionalidade:'brasileira',estadoCivil:'',profissao:'',
+    regimeCasamento:'',dataCasamento:'',nomeConjuge:'',nacionalidadeConjuge:'brasileiro(a)',profissaoConjuge:'',rgConjuge:'',cpfConjuge:''
+,rg:'',cpf:'',
     endereco:'',cidade:'Mamborê/PR',cep:'87340-000',email:'',telefone:'',
     dataTerraN:'',dataTerraNExtenso:'',quadraN:'',quadraNExtenso:'',areaM2:'',
     enderecoImovel:'',cidadeImovel:'Mamborê/PR',matricula:'',livro:'',
@@ -681,6 +683,25 @@ function G4Investimoveis(){
                   <option value="">Selecione</option><option>solteiro(a)</option><option>casado(a)</option><option>divorciado(a)</option><option>viúvo(a)</option><option>união estável</option>
                 </select></div>
               </div>
+              {/* Seção Condicional: Dados do Cônjuge */}
+              {(dadosContrato.estadoCivil==='casado(a)'||dadosContrato.estadoCivil==='união estável')&&(
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                  <h4 className="font-semibold text-blue-800 text-sm mb-2">Dados do Cônjuge</h4>
+                  <div><label className={labelCls}>Regime de Casamento</label><select value={dadosContrato.regimeCasamento} onChange={e=>setDadosContrato({...dadosContrato,regimeCasamento:e.target.value})} className={inputCls}>
+                    <option value="">Selecione</option><option>comunhão parcial de bens</option><option>comunhão universal de bens</option><option>separação total de bens</option><option>participação final nos aquestos</option>
+                  </select></div>
+                  <div><label className={labelCls}>Data do Casamento</label><input type="text" value={dadosContrato.dataCasamento} onChange={e=>setDadosContrato({...dadosContrato,dataCasamento:e.target.value})} placeholder="Ex: 15 de janeiro de 2003" className={inputCls}/></div>
+                  <div><label className={labelCls}>Nome Completo do Cônjuge</label><input type="text" value={dadosContrato.nomeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nomeConjuge:e.target.value})} placeholder="Ex: João Carlos dos Santos" className={inputCls}/></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidadeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nacionalidadeConjuge:e.target.value})} className={inputCls}/></div>
+                    <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissaoConjuge} onChange={e=>setDadosContrato({...dadosContrato,profissaoConjuge:e.target.value})} placeholder="Ex: aposentado" className={inputCls}/></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rgConjuge} onChange={e=>setDadosContrato({...dadosContrato,rgConjuge:e.target.value})} placeholder="Ex: 12.345.678-9-SSP/SP" className={inputCls}/></div>
+                    <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpfConjuge} onChange={e=>setDadosContrato({...dadosContrato,cpfConjuge:e.target.value})} placeholder="Ex: 123.456.789-00" className={inputCls}/></div>
+                  </div>
+                </div>
+              )}
               <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: aposentada" className={inputCls}/></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg} onChange={e=>setDadosContrato({...dadosContrato,rg:e.target.value})} placeholder="Ex: 26.873.295-4-SSP/SP" className={inputCls}/></div>
