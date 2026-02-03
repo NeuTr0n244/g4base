@@ -152,13 +152,12 @@ function gerarPreviewTexto(d){
 }
 
 function G4Investimoveis(){
-  // === FIREBASE FIRESTORE HELPERS ===
-  const getDocId=(item)=>item._docId||String(item.id);
-  const fsLoad=async(col)=>{try{const snap=await db.collection(col).get();return snap.docs.map(d=>({...d.data(),_docId:d.id}));}catch(e){console.error('Erro ao carregar '+col,e);setSyncStatus('❌ Erro: '+e.message);return null;}};
-  const fsSave=async(col,item)=>{try{const docId=getDocId(item);const clean={...item};delete clean._docId;await db.collection(col).doc(docId).set(clean);return true;}catch(e){console.error('Erro ao salvar',e);setSyncStatus('❌ Erro ao salvar: '+e.message);return false;}};
-  const fsDeleteDoc=async(col,item)=>{try{const docId=getDocId(item);await db.collection(col).doc(docId).delete();return true;}catch(e){console.error('Erro ao excluir',e);setSyncStatus('❌ Erro ao excluir: '+e.message);return false;}};
-  const fsSaveAll=async(col,items)=>{try{const batch=db.batch();items.forEach(item=>{const docId=getDocId(item);const clean={...item};delete clean._docId;batch.set(db.collection(col).doc(docId),clean);});await batch.commit();return true;}catch(e){console.error('Erro ao salvar lote',e);setSyncStatus('❌ Erro ao salvar: '+e.message);return false;}};
-  const fsDeleteAll=async(col)=>{try{const snap=await db.collection(col).get();if(snap.empty)return true;const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();return true;}catch(e){console.error('Erro ao limpar',e);return false;}};
+  // === FIREBASE FIRESTORE - REAL-TIME SYNC ===
+  const cleanForFS=(item)=>{const c={...item};delete c._docId;return c;};
+  const fsAdd=async(col,item)=>{try{const c=cleanForFS(item);await db.collection(col).doc(String(item.id)).set(c);setSyncStatus('✓ Salvo');return true;}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);return false;}};
+  const fsDel=async(col,docId)=>{try{await db.collection(col).doc(docId).delete();setSyncStatus('✓ Excluído');return true;}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);return false;}};
+  const fsWipe=async(col)=>{try{const snap=await db.collection(col).get();if(snap.empty)return;const b=db.batch();snap.docs.forEach(d=>b.delete(d.ref));await b.commit();}catch(e){console.error(e);}};
+  const fsBulk=async(col,items)=>{try{const b=db.batch();items.forEach(i=>{b.set(db.collection(col).doc(String(i.id)),cleanForFS(i));});await b.commit();return true;}catch(e){console.error(e);return false;}};
 
   const[loading,setLoading]=useState(true);
   const[syncStatus,setSyncStatus]=useState('');
@@ -243,68 +242,69 @@ function G4Investimoveis(){
     {id:4,cliente:'João Vitor Guimaraes Ribeiro',imovel:'João Paulo II - Lote 14',tipo:'Venda',valor:'R$ 60.000,00',dataInicio:'2026-01-07',dataVencimento:'2026-04-07',status:'ativo'},
   ];
 
-  // === CARREGAR DADOS DO FIRESTORE NA INICIALIZAÇÃO ===
+  // === REAL-TIME LISTENERS (onSnapshot) ===
   useEffect(()=>{
-    const loadData=async()=>{
+    setSyncStatus('Conectando ao Firebase...');
+    
+    // One-time migration: wipe old data with wrong IDs and re-save
+    const migrate=async()=>{
       try{
-        setSyncStatus('Conectando ao Firebase...');
-        const[cl,tf,ct]=await Promise.all([fsLoad('clientes'),fsLoad('tarefas'),fsLoad('contratos')]);
-        
-        // Helper: migrate collection - delete all docs, re-save with id-based doc names
-        const migrate=async(col,items)=>{
-          await fsDeleteAll(col);
-          if(items.length>0){
-            const batch=db.batch();
-            items.forEach(item=>{
-              const clean={...item};delete clean._docId;
-              batch.set(db.collection(col).doc(String(item.id)),clean);
-            });
-            await batch.commit();
-          }
-          return items.map(i=>({...i,_docId:String(i.id)}));
-        };
-        
-        if(cl!==null&&cl.length>0){
-          // Check if _docId matches String(id) - if not, migrate
-          const needsMigrate=cl.some(c=>c._docId!==String(c.id));
-          if(needsMigrate){const migrated=await migrate('clientes',cl);setClientes(migrated);}
-          else setClientes(cl);
+        const migrated=localStorage.getItem('g4_migrated_v2');
+        if(migrated)return;
+        setSyncStatus('Migrando dados...');
+        // Wipe all collections
+        for(const col of ['clientes','tarefas','contratos']){
+          const snap=await db.collection(col).get();
+          if(!snap.empty){const b=db.batch();snap.docs.forEach(d=>b.delete(d.ref));await b.commit();}
         }
-        else if(cl!==null&&cl.length===0){const m=await migrate('clientes',dadosIniciaisClientes);setClientes(m);}
-        else{setClientes(dadosIniciaisClientes);}
-        
-        if(tf!==null&&tf.length>0){
-          const needsMigrate=tf.some(t=>t._docId!==String(t.id));
-          if(needsMigrate){const migrated=await migrate('tarefas',tf);setTarefas(migrated);}
-          else setTarefas(tf);
-        }
-        else if(tf!==null&&tf.length===0){const m=await migrate('tarefas',dadosIniciaisTarefas);setTarefas(m);}
-        else{setTarefas(dadosIniciaisTarefas);}
-        
-        if(ct!==null&&ct.length>0){
-          const needsMigrate=ct.some(c=>c._docId!==String(c.id));
-          if(needsMigrate){const migrated=await migrate('contratos',ct);setContratos(migrated);}
-          else setContratos(ct);
-        }
-        else if(ct!==null&&ct.length===0){const m=await migrate('contratos',dadosIniciaisContratos);setContratos(m);}
-        else{setContratos(dadosIniciaisContratos);}
-        
-        setSyncStatus('✓ Dados sincronizados');
-        loadedRef.current=true;
-      }catch(e){
-        console.error('Erro Firebase:',e);
-        setClientes(dadosIniciaisClientes);setTarefas(dadosIniciaisTarefas);setContratos(dadosIniciaisContratos);
-        setSyncStatus('⚠ Modo offline');
-        loadedRef.current=true;
-      }finally{setLoading(false);}
+        // Re-save with correct IDs
+        await fsBulk('clientes',dadosIniciaisClientes);
+        await fsBulk('tarefas',dadosIniciaisTarefas);
+        await fsBulk('contratos',dadosIniciaisContratos);
+        localStorage.setItem('g4_migrated_v2','true');
+        setSyncStatus('✓ Migração concluída');
+      }catch(e){console.error('Erro migração:',e);}
     };
-    loadData();
+    
+    migrate().then(()=>{
+    let initCount=0;
+    const checkReady=()=>{initCount++;if(initCount>=3){loadedRef.current=true;setLoading(false);setSyncStatus('✓ Conectado em tempo real');}};
+    
+    const unsub1=db.collection('clientes').onSnapshot(snap=>{
+      if(snap.empty&&!loadedRef.current){
+        fsBulk('clientes',dadosIniciaisClientes);
+      }else{
+        const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+        setClientes(items);
+      }
+      checkReady();
+    },e=>{console.error('Erro clientes:',e);setClientes(dadosIniciaisClientes);checkReady();});
+    
+    const unsub2=db.collection('tarefas').onSnapshot(snap=>{
+      if(snap.empty&&!loadedRef.current){
+        fsBulk('tarefas',dadosIniciaisTarefas);
+      }else{
+        const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+        setTarefas(items);
+      }
+      checkReady();
+    },e=>{console.error('Erro tarefas:',e);setTarefas(dadosIniciaisTarefas);checkReady();});
+    
+    const unsub3=db.collection('contratos').onSnapshot(snap=>{
+      if(snap.empty&&!loadedRef.current){
+        fsBulk('contratos',dadosIniciaisContratos);
+      }else{
+        const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+        setContratos(items);
+      }
+      checkReady();
+    },e=>{console.error('Erro contratos:',e);setContratos(dadosIniciaisContratos);checkReady();});
+    
+    // Store unsubs for cleanup
+    window._g4unsubs=[unsub1,unsub2,unsub3];
+    });
+    return()=>{if(window._g4unsubs)window._g4unsubs.forEach(u=>u());};
   },[]);
-
-  // === SYNC STATUS AUTO-HIDE ===
-  const prevClientes=React.useRef(null);
-  const prevTarefas=React.useRef(null);
-  const prevContratos=React.useRef(null);
 
   // Auto-hide sync status
   useEffect(()=>{
@@ -331,17 +331,12 @@ function G4Investimoveis(){
 
   // HOME funcs
   const handleAddCliente=async()=>{
-    const item=editingCliente?{...novoCliente,id:editingCliente.id,_docId:editingCliente._docId}:{...novoCliente,id:Date.now()};
-    try{
-      await fsSave('clientes',item);
-      if(editingCliente)setClientes(prev=>prev.map(c=>c.id===editingCliente.id?item:c));
-      else setClientes(prev=>[...prev,item]);
-      setSyncStatus('✓ Salvo');
-    }catch(e){console.error(e);setSyncStatus('❌ Erro ao salvar: '+e.message);}
+    const item=editingCliente?{...novoCliente,id:editingCliente.id}:{...novoCliente,id:Date.now()};
+    await fsAdd('clientes',item);
     setShowModal(false);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setEditingCliente(null);
   };
   const handleEdit=(c)=>{setEditingCliente(c);setNovoCliente(c);setShowModal(true);};
-  const handleDelete=async(id)=>{if(confirm('Excluir este cliente?')){const c=clientes.find(x=>x.id===id);if(!c)return;const ok=await fsDeleteDoc('clientes',c);if(ok){setClientes(prev=>prev.filter(x=>x.id!==id));setSyncStatus('✓ Cliente excluído');}}};
+  const handleDelete=async(id)=>{if(confirm('Excluir este cliente?')){const c=clientes.find(x=>x.id===id);if(c)await fsDel('clientes',c._docId||String(c.id));}};
   const getIC=(i)=>{const c={'Locação':'bg-emerald-500/20 text-emerald-600 border-emerald-500/30','Compra':'bg-blue-500/20 text-blue-600 border-blue-500/30','Venda':'bg-amber-500/20 text-amber-600 border-amber-500/30','Avaliação':'bg-purple-500/20 text-purple-600 border-purple-500/30','Troca':'bg-pink-500/20 text-pink-600 border-pink-500/30'};return c[i]||'bg-gray-500/20 text-gray-600 border-gray-500/30';};
 
   // CALENDÁRIO funcs
@@ -354,10 +349,10 @@ function G4Investimoveis(){
   const mesAnterior=()=>{if(mesAtual===0){setMesAtual(11);setAnoAtual(anoAtual-1);}else setMesAtual(mesAtual-1);};
   const mesSeguinte=()=>{if(mesAtual===11){setMesAtual(0);setAnoAtual(anoAtual+1);}else setMesAtual(mesAtual+1);};
   const abrirNovaTarefa=(dia)=>{const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';setNovaTarefa({titulo:'',descricao:'',data:ds,hora:'',prioridade:'media',concluida:false});setEditingTarefa(null);setShowTarefaModal(true);};
-  const handleAddTarefa=async()=>{if(!novaTarefa.titulo||!novaTarefa.data)return;const item=editingTarefa?{...novaTarefa,id:editingTarefa.id,_docId:editingTarefa._docId}:{...novaTarefa,id:Date.now()};try{await fsSave('tarefas',item);if(editingTarefa)setTarefas(prev=>prev.map(t=>t.id===editingTarefa.id?item:t));else setTarefas(prev=>[...prev,item]);setSyncStatus('✓ Salvo');}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);}setShowTarefaModal(false);setEditingTarefa(null);};
-  const toggleConcluida=async(id)=>{const t=tarefas.find(x=>x.id===id);if(!t)return;const updated={...t,concluida:!t.concluida};const ok=await fsSave('tarefas',updated);if(ok){setTarefas(prev=>prev.map(x=>x.id===id?updated:x));setSyncStatus('✓ Salvo');}};
+  const handleAddTarefa=async()=>{if(!novaTarefa.titulo||!novaTarefa.data)return;const item=editingTarefa?{...novaTarefa,id:editingTarefa.id}:{...novaTarefa,id:Date.now()};await fsAdd('tarefas',item);setShowTarefaModal(false);setEditingTarefa(null);};
+  const toggleConcluida=async(id)=>{const t=tarefas.find(x=>x.id===id);if(!t)return;await fsAdd('tarefas',{...t,concluida:!t.concluida});};
   const editarTarefa=(t)=>{setEditingTarefa(t);setNovaTarefa(t);setShowTarefaModal(true);};
-  const deletarTarefa=async(id)=>{if(confirm('Excluir?')){const t=tarefas.find(x=>x.id===id);if(!t)return;const ok=await fsDeleteDoc('tarefas',t);if(ok){setTarefas(prev=>prev.filter(x=>x.id!==id));setSyncStatus('✓ Tarefa excluída');}}};
+  const deletarTarefa=async(id)=>{if(confirm('Excluir?')){const t=tarefas.find(x=>x.id===id);if(t)await fsDel('tarefas',t._docId||String(t.id));}};
   const getPC=(p)=>p==='alta'?'bg-red-500':p==='media'?'bg-amber-500':'bg-green-500';
   const getPL=(p)=>p==='alta'?'Alta':p==='media'?'Média':'Baixa';
   const fmtData=(d)=>{const[a,m,dia]=d.split('-');return`${dia}/${m}/${a}`;};
@@ -372,8 +367,8 @@ function G4Investimoveis(){
 
   const handleAddContrato=async()=>{
     if(!novoContrato.cliente)return;
-    const item=editingContrato?{...novoContrato,id:editingContrato.id,_docId:editingContrato._docId}:{...novoContrato,id:Date.now()};
-    try{await fsSave('contratos',item);if(editingContrato)setContratos(prev=>prev.map(c=>c.id===editingContrato.id?item:c));else setContratos(prev=>[...prev,item]);setSyncStatus('✓ Salvo');}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);}
+    const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now()};
+    await fsAdd('contratos',item);
     setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo'});
   };
 
@@ -652,7 +647,7 @@ function G4Investimoveis(){
                 </div>
                 <div className="flex gap-2">
                   <button onClick={()=>{setEditingContrato(c);setNovoContrato(c);setShowContratoModal(true);}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors" title="Editar"><Icons.Edit2/></button>
-                  <button onClick={async()=>{if(confirm('Excluir contrato?')){const ok=await fsDeleteDoc('contratos',c);if(ok){setContratos(prev=>prev.filter(x=>x.id!==c.id));setSyncStatus('✓ Contrato excluído');}}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
+                  <button onClick={async()=>{if(confirm('Excluir contrato?')){await fsDel('contratos',c._docId||String(c.id));}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
                 </div>
               </div>
             </div>);
