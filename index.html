@@ -268,61 +268,10 @@ function G4Investimoveis(){
     loadData();
   },[]);
 
-  // === AUTO-SYNC: salvar no Firestore quando dados mudam ===
+  // === SYNC STATUS AUTO-HIDE ===
   const prevClientes=React.useRef(null);
   const prevTarefas=React.useRef(null);
   const prevContratos=React.useRef(null);
-
-  const syncCollection=async(col,prev,current)=>{
-    try{
-      setSyncStatus('Salvando...');
-      // Find deleted items
-      if(prev){
-        const currentIds=new Set(current.map(i=>String(i.id)));
-        const deleted=prev.filter(i=>!currentIds.has(String(i.id)));
-        for(const item of deleted){
-          await db.collection(col).doc(String(item.id)).delete();
-        }
-      }
-      // Save current items
-      if(current.length>0){
-        const batch=db.batch();
-        current.forEach(item=>{
-          const clean={...item};delete clean._docId;
-          batch.set(db.collection(col).doc(String(item.id)),clean);
-        });
-        await batch.commit();
-      }
-      setSyncStatus('✓ Salvo');
-    }catch(e){
-      console.error('Erro sync '+col,e);
-      setSyncStatus('❌ Erro: '+e.message);
-    }
-  };
-
-  useEffect(()=>{
-    if(!loadedRef.current)return;
-    if(prevClientes.current!==null&&JSON.stringify(prevClientes.current)!==JSON.stringify(clientes)){
-      syncCollection('clientes',prevClientes.current,clientes);
-    }
-    prevClientes.current=clientes;
-  },[clientes]);
-
-  useEffect(()=>{
-    if(!loadedRef.current)return;
-    if(prevTarefas.current!==null&&JSON.stringify(prevTarefas.current)!==JSON.stringify(tarefas)){
-      syncCollection('tarefas',prevTarefas.current,tarefas);
-    }
-    prevTarefas.current=tarefas;
-  },[tarefas]);
-
-  useEffect(()=>{
-    if(!loadedRef.current)return;
-    if(prevContratos.current!==null&&JSON.stringify(prevContratos.current)!==JSON.stringify(contratos)){
-      syncCollection('contratos',prevContratos.current,contratos);
-    }
-    prevContratos.current=contratos;
-  },[contratos]);
 
   // Auto-hide sync status
   useEffect(()=>{
@@ -348,13 +297,19 @@ function G4Investimoveis(){
   const stats=useMemo(()=>({total:clientes.length,locacao:clientes.filter(c=>c.interesse==='Locação').length,compra:clientes.filter(c=>c.interesse==='Compra').length,venda:clientes.filter(c=>c.interesse==='Venda').length}),[clientes]);
 
   // HOME funcs
-  const handleAddCliente=()=>{
-    if(editingCliente)setClientes(clientes.map(c=>c.id===editingCliente.id?{...novoCliente,id:editingCliente.id}:c));
-    else setClientes([...clientes,{...novoCliente,id:Date.now()}]);
+  const handleAddCliente=async()=>{
+    const item=editingCliente?{...novoCliente,id:editingCliente.id}:{...novoCliente,id:Date.now()};
+    try{
+      const clean={...item};delete clean._docId;
+      await db.collection('clientes').doc(String(item.id)).set(clean);
+      if(editingCliente)setClientes(prev=>prev.map(c=>c.id===editingCliente.id?item:c));
+      else setClientes(prev=>[...prev,item]);
+      setSyncStatus('✓ Salvo');
+    }catch(e){console.error(e);setSyncStatus('❌ Erro ao salvar: '+e.message);}
     setShowModal(false);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setEditingCliente(null);
   };
   const handleEdit=(c)=>{setEditingCliente(c);setNovoCliente(c);setShowModal(true);};
-  const handleDelete=(id)=>{if(confirm('Excluir este cliente?')){setClientes(clientes.filter(c=>c.id!==id));fsDelete('clientes',id);}};
+  const handleDelete=async(id)=>{if(confirm('Excluir este cliente?')){try{await db.collection('clientes').doc(String(id)).delete();setClientes(prev=>prev.filter(c=>c.id!==id));setSyncStatus('✓ Cliente excluído');}catch(e){console.error(e);setSyncStatus('❌ Erro ao excluir: '+e.message);}}};
   const getIC=(i)=>{const c={'Locação':'bg-emerald-500/20 text-emerald-600 border-emerald-500/30','Compra':'bg-blue-500/20 text-blue-600 border-blue-500/30','Venda':'bg-amber-500/20 text-amber-600 border-amber-500/30','Avaliação':'bg-purple-500/20 text-purple-600 border-purple-500/30','Troca':'bg-pink-500/20 text-pink-600 border-pink-500/30'};return c[i]||'bg-gray-500/20 text-gray-600 border-gray-500/30';};
 
   // CALENDÁRIO funcs
@@ -367,10 +322,10 @@ function G4Investimoveis(){
   const mesAnterior=()=>{if(mesAtual===0){setMesAtual(11);setAnoAtual(anoAtual-1);}else setMesAtual(mesAtual-1);};
   const mesSeguinte=()=>{if(mesAtual===11){setMesAtual(0);setAnoAtual(anoAtual+1);}else setMesAtual(mesAtual+1);};
   const abrirNovaTarefa=(dia)=>{const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';setNovaTarefa({titulo:'',descricao:'',data:ds,hora:'',prioridade:'media',concluida:false});setEditingTarefa(null);setShowTarefaModal(true);};
-  const handleAddTarefa=()=>{if(!novaTarefa.titulo||!novaTarefa.data)return;if(editingTarefa)setTarefas(tarefas.map(t=>t.id===editingTarefa.id?{...novaTarefa,id:editingTarefa.id}:t));else setTarefas([...tarefas,{...novaTarefa,id:Date.now()}]);setShowTarefaModal(false);setEditingTarefa(null);};
-  const toggleConcluida=(id)=>setTarefas(tarefas.map(t=>t.id===id?{...t,concluida:!t.concluida}:t));
+  const handleAddTarefa=async()=>{if(!novaTarefa.titulo||!novaTarefa.data)return;const item=editingTarefa?{...novaTarefa,id:editingTarefa.id}:{...novaTarefa,id:Date.now()};try{const clean={...item};delete clean._docId;await db.collection('tarefas').doc(String(item.id)).set(clean);if(editingTarefa)setTarefas(prev=>prev.map(t=>t.id===editingTarefa.id?item:t));else setTarefas(prev=>[...prev,item]);setSyncStatus('✓ Salvo');}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);}setShowTarefaModal(false);setEditingTarefa(null);};
+  const toggleConcluida=async(id)=>{const t=tarefas.find(x=>x.id===id);if(!t)return;const updated={...t,concluida:!t.concluida};try{const clean={...updated};delete clean._docId;await db.collection('tarefas').doc(String(id)).set(clean);setTarefas(prev=>prev.map(x=>x.id===id?updated:x));setSyncStatus('✓ Salvo');}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);}};
   const editarTarefa=(t)=>{setEditingTarefa(t);setNovaTarefa(t);setShowTarefaModal(true);};
-  const deletarTarefa=(id)=>{if(confirm('Excluir?')){setTarefas(tarefas.filter(t=>t.id!==id));fsDelete('tarefas',id);}};
+  const deletarTarefa=async(id)=>{if(confirm('Excluir?')){try{await db.collection('tarefas').doc(String(id)).delete();setTarefas(prev=>prev.filter(t=>t.id!==id));setSyncStatus('✓ Tarefa excluída');}catch(e){console.error(e);setSyncStatus('❌ Erro ao excluir: '+e.message);}}};
   const getPC=(p)=>p==='alta'?'bg-red-500':p==='media'?'bg-amber-500':'bg-green-500';
   const getPL=(p)=>p==='alta'?'Alta':p==='media'?'Média':'Baixa';
   const fmtData=(d)=>{const[a,m,dia]=d.split('-');return`${dia}/${m}/${a}`;};
@@ -383,10 +338,10 @@ function G4Investimoveis(){
 
   const totalNotifs=tarefasPendentes+contratosVencendo.length+contratosVencidos.length;
 
-  const handleAddContrato=()=>{
+  const handleAddContrato=async()=>{
     if(!novoContrato.cliente)return;
-    if(editingContrato)setContratos(contratos.map(c=>c.id===editingContrato.id?{...novoContrato,id:editingContrato.id}:c));
-    else setContratos([...contratos,{...novoContrato,id:Date.now()}]);
+    const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now()};
+    try{const clean={...item};delete clean._docId;await db.collection('contratos').doc(String(item.id)).set(clean);if(editingContrato)setContratos(prev=>prev.map(c=>c.id===editingContrato.id?item:c));else setContratos(prev=>[...prev,item]);setSyncStatus('✓ Salvo');}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);}
     setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo'});
   };
 
@@ -665,7 +620,7 @@ function G4Investimoveis(){
                 </div>
                 <div className="flex gap-2">
                   <button onClick={()=>{setEditingContrato(c);setNovoContrato(c);setShowContratoModal(true);}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors" title="Editar"><Icons.Edit2/></button>
-                  <button onClick={()=>{if(confirm('Excluir contrato?')){setContratos(contratos.filter(x=>x.id!==c.id));fsDelete('contratos',c.id);}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
+                  <button onClick={async()=>{if(confirm('Excluir contrato?')){try{await db.collection('contratos').doc(String(c.id)).delete();setContratos(prev=>prev.filter(x=>x.id!==c.id));setSyncStatus('✓ Contrato excluído');}catch(e){console.error(e);setSyncStatus('❌ Erro: '+e.message);}}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
                 </div>
               </div>
             </div>);
