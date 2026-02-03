@@ -153,10 +153,10 @@ function gerarPreviewTexto(d){
 
 function G4Investimoveis(){
   // === FIREBASE FIRESTORE HELPERS ===
-  const fsLoad=async(col)=>{try{const snap=await db.collection(col).get();return snap.docs.map(d=>({...d.data(),_docId:d.id}));}catch(e){console.error('Erro ao carregar '+col,e);return null;}};
-  const fsSave=async(col,id,data)=>{try{const clean={...data};delete clean._docId;await db.collection(col).doc(String(id)).set(clean);}catch(e){console.error('Erro ao salvar',e);}};
-  const fsDelete=async(col,id)=>{try{await db.collection(col).doc(String(id)).delete();}catch(e){console.error('Erro ao excluir',e);}};
-  const fsSaveAll=async(col,items)=>{try{const batch=db.batch();items.forEach(item=>{const clean={...item};delete clean._docId;batch.set(db.collection(col).doc(String(item.id)),clean);});await batch.commit();}catch(e){console.error('Erro ao salvar lote',e);}};
+  const fsLoad=async(col)=>{try{const snap=await db.collection(col).get();return snap.docs.map(d=>({...d.data(),_docId:d.id}));}catch(e){console.error('Erro ao carregar '+col,e);setSyncStatus('❌ Erro: '+e.message);return null;}};
+  const fsSave=async(col,id,data)=>{try{const clean={...data};delete clean._docId;await db.collection(col).doc(String(id)).set(clean);return true;}catch(e){console.error('Erro ao salvar',e);setSyncStatus('❌ Erro ao salvar: '+e.message);return false;}};
+  const fsDelete=async(col,id)=>{try{await db.collection(col).doc(String(id)).delete();return true;}catch(e){console.error('Erro ao excluir',e);setSyncStatus('❌ Erro ao excluir: '+e.message);return false;}};
+  const fsSaveAll=async(col,items)=>{try{const batch=db.batch();items.forEach(item=>{const clean={...item};delete clean._docId;batch.set(db.collection(col).doc(String(item.id)),clean);});await batch.commit();return true;}catch(e){console.error('Erro ao salvar lote',e);setSyncStatus('❌ Erro ao salvar: '+e.message);return false;}};
 
   const[loading,setLoading]=useState(true);
   const[syncStatus,setSyncStatus]=useState('');
@@ -303,6 +303,7 @@ function G4Investimoveis(){
   // Auto-hide sync status
   useEffect(()=>{
     if(syncStatus&&syncStatus.startsWith('✓')){const t=setTimeout(()=>setSyncStatus(''),2000);return()=>clearTimeout(t);}
+    if(syncStatus&&syncStatus.startsWith('❌')){const t=setTimeout(()=>setSyncStatus(''),8000);return()=>clearTimeout(t);}
   },[syncStatus]);
 
   const interesses=['Locação','Compra','Venda','Avaliação','Troca'];
@@ -398,7 +399,7 @@ function G4Investimoveis(){
   return(
   <div className="min-h-screen bg-gray-100">
     {/* SYNC STATUS */}
-    {syncStatus&&<div className={`fixed top-2 right-2 z-50 px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg transition-all ${syncStatus.startsWith('✓')?'bg-green-500 text-white':syncStatus.startsWith('⚠')?'bg-yellow-500 text-white':'bg-blue-500 text-white'}`}>{syncStatus}</div>}
+    {syncStatus&&<div className={`fixed top-2 right-2 z-50 px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg transition-all ${syncStatus.startsWith('✓')?'bg-green-500 text-white':syncStatus.startsWith('❌')?'bg-red-600 text-white':syncStatus.startsWith('⚠')?'bg-yellow-500 text-white':'bg-blue-500 text-white'}`}>{syncStatus}</div>}
     {/* HEADER */}
     <header className="bg-gray-800 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 py-4">
