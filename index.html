@@ -94,7 +94,13 @@ async function gerarDocxReal(d){
     ['a proprietária, ',propri+', '],
     ['MARIA DOMINGUES DOS SANTOS',(d.nome||'_________________________').toUpperCase()],
     ['brasileira, viúva, aposentada, portadora CI/RG nº 26.873.295-4-SSP/SP e CPF nº ',
-     (d.nacionalidade||'brasileiro(a)')+', '+(d.estadoCivil||'_____________')+', '+(d.profissao||'_____________')+', '+portador+' CI/RG nº '+(d.rg||'_____________')+' e CPF nº '],
+     (d.nacionalidade||'brasileiro(a)')+', '+(d.estadoCivil||'_____________')+
+     ((d.estadoCivil==='casado(a)'||d.estadoCivil==='união estável')&&d.nomeConjuge?
+      ' sob regime de '+(d.regimeCasamento||'_____________')+' em '+(d.dataCasamento||'_____________')+
+      ' com '+(d.nomeConjuge||'_____________').toUpperCase()+', '+(d.nacionalidadeConjuge||'brasileiro(a)')+
+      ', '+(d.profissaoConjuge||'_____________')+', portador'+(d.genero==='feminino'?'a':'')+
+      ' CI/RG nº '+(d.rgConjuge||'_____________')+' e CPF nº '+(d.cpfConjuge||'_____________')+',':'')+
+     ' '+(d.profissao||'_____________')+', '+portador+' CI/RG nº '+(d.rg||'_____________')+' e CPF nº '],
     ['599.542.489-00, residente e domiciliada na Rua Piraí, nº 60, centro, Mamborê/PR',
      (d.cpf||'_____________')+', residente e '+domiciliad+' na '+(d.endereco||'_____________')+', '+(d.cidade||'Mamborê/PR')],
     [', CEP: 87340-000,',', CEP: '+(d.cep||'87340-000')+','],
@@ -127,6 +133,11 @@ function gerarPreviewTexto(d){
   const items=[
     ['Nome',d.nome],['Gênero',d.genero==='feminino'?'Feminino (A Contratante)':d.genero==='masculino'?'Masculino (O Contratante)':'Plural (Os Contratantes)'],
     ['Nacionalidade',d.nacionalidade],['Estado Civil',d.estadoCivil],['Profissão',d.profissao],
+    ...((d.estadoCivil==='casado(a)'||d.estadoCivil==='união estável')?[
+      ['Regime de Casamento',d.regimeCasamento],['Data do Casamento',d.dataCasamento],
+      ['Nome do Cônjuge',d.nomeConjuge],['Nacionalidade Cônjuge',d.nacionalidadeConjuge],
+      ['Profissão Cônjuge',d.profissaoConjuge],['RG Cônjuge',d.rgConjuge],['CPF Cônjuge',d.cpfConjuge]
+    ]:[]),
     ['RG',d.rg],['CPF',d.cpf],['Endereço',d.endereco],['Cidade',d.cidade],['CEP',d.cep],
     ['E-mail',d.email],['Telefone',d.telefone],
     ['','<hr style="margin:10px 0"/>'],
