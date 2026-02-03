@@ -249,21 +249,20 @@ function G4Investimoveis(){
     // One-time migration: wipe old data with wrong IDs and re-save
     const migrate=async()=>{
       try{
-        const migrated=localStorage.getItem('g4_migrated_v2');
-        if(migrated)return;
+        const migrated=localStorage.getItem('g4_migrated_v3');
+        if(migrated)return false;
         setSyncStatus('Migrando dados...');
-        // Wipe all collections
         for(const col of ['clientes','tarefas','contratos']){
           const snap=await db.collection(col).get();
           if(!snap.empty){const b=db.batch();snap.docs.forEach(d=>b.delete(d.ref));await b.commit();}
         }
-        // Re-save with correct IDs
         await fsBulk('clientes',dadosIniciaisClientes);
         await fsBulk('tarefas',dadosIniciaisTarefas);
         await fsBulk('contratos',dadosIniciaisContratos);
-        localStorage.setItem('g4_migrated_v2','true');
+        localStorage.setItem('g4_migrated_v3','true');
         setSyncStatus('✓ Migração concluída');
-      }catch(e){console.error('Erro migração:',e);}
+        return true;
+      }catch(e){console.error('Erro migração:',e);return false;}
     };
     
     migrate().then(()=>{
@@ -271,36 +270,23 @@ function G4Investimoveis(){
     const checkReady=()=>{initCount++;if(initCount>=3){loadedRef.current=true;setLoading(false);setSyncStatus('✓ Conectado em tempo real');}};
     
     const unsub1=db.collection('clientes').onSnapshot(snap=>{
-      if(snap.empty&&!loadedRef.current){
-        fsBulk('clientes',dadosIniciaisClientes);
-      }else{
-        const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
-        setClientes(items);
-      }
+      const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+      setClientes(items);
       checkReady();
-    },e=>{console.error('Erro clientes:',e);setClientes(dadosIniciaisClientes);checkReady();});
+    },e=>{console.error('Erro clientes:',e);checkReady();});
     
     const unsub2=db.collection('tarefas').onSnapshot(snap=>{
-      if(snap.empty&&!loadedRef.current){
-        fsBulk('tarefas',dadosIniciaisTarefas);
-      }else{
-        const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
-        setTarefas(items);
-      }
+      const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+      setTarefas(items);
       checkReady();
-    },e=>{console.error('Erro tarefas:',e);setTarefas(dadosIniciaisTarefas);checkReady();});
+    },e=>{console.error('Erro tarefas:',e);checkReady();});
     
     const unsub3=db.collection('contratos').onSnapshot(snap=>{
-      if(snap.empty&&!loadedRef.current){
-        fsBulk('contratos',dadosIniciaisContratos);
-      }else{
-        const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
-        setContratos(items);
-      }
+      const items=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+      setContratos(items);
       checkReady();
-    },e=>{console.error('Erro contratos:',e);setContratos(dadosIniciaisContratos);checkReady();});
+    },e=>{console.error('Erro contratos:',e);checkReady();});
     
-    // Store unsubs for cleanup
     window._g4unsubs=[unsub1,unsub2,unsub3];
     });
     return()=>{if(window._g4unsubs)window._g4unsubs.forEach(u=>u());};
