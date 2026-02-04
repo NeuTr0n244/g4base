@@ -77,14 +77,26 @@ const TEMPLATE_DOCX = "UEsDBBQAAAAIACUtQ1yYrcUK3QAAAEQCAAALAAAAX3JlbHMvLnJlbHOtk
 async function gerarDocxReal(d){
   const f=d.genero==='feminino',m=d.genero==='masculino';
   const propri=f?'a proprietária':m?'o proprietário':'os proprietários';
-  const portador=f?'portadora':'portador';
-  const domiciliad=f?'domiciliada':m?'domiciliado':'domiciliados';
+  const portadorMain=d.portadorGenero||'portador';
+  // Residency conjugation
+  const hasSpouse=(d.estadoCivil==='casado(a)'||d.estadoCivil==='união estável')&&d.nomeConjuge;
+  const residente=hasSpouse?'residentes e domiciliados':f?'residente e domiciliada':m?'residente e domiciliado':'residentes e domiciliados';
   const denominad=f?'denominada simplesmente':m?'denominado simplesmente':'denominados simplesmente';
   const vendedoraP1=f?'A promitente vendedora se compromete e se responsabiliza':m?'O promitente vendedor se compromete e se responsabiliza':'Os promitentes vendedores se comprometem e se responsabilizam';
   const vendedoraP2=f?'A promitente vendedora se compromete a apresentar':m?'O promitente vendedor se compromete a apresentar':'Os promitentes vendedores se comprometem a apresentar';
   const daVendedora=f?'da vendedora':m?'do vendedor':'dos vendedores';
   const pelaProprietaria=f?'pela proprietária':m?'pelo proprietário':'pelos proprietários';
   const aVendedora=f?'a vendedora':m?'ao vendedor':'aos vendedores';
+  // Build main contractor text: nacionalidade, profissão, portador(a) CI/RG nº RG-orgao/UF e CPF
+  let contratanteTexto=(d.nacionalidade||'brasileiro(a)')+', '+(d.profissao||'_____________')+', '+portadorMain+' CI/RG nº '+(d.rg||'_____________')+'-'+(d.orgaoEmissor||'SSP')+'/'+(d.rgUF||'PR')+' e CPF nº ';
+  // Spouse block (inserted between CPF nº and the CPF value)
+  let spouseTexto='';
+  if(hasSpouse){
+    const portadorConj=d.portadorGeneroConjuge||'portador';
+    spouseTexto=(d.cpf||'_____________')+', '+(d.estadoCivil||'_____________')+' sob regime de '+(d.regimeCasamento||'_____________')+' em '+(d.dataCasamento||'_____________')+
+    ' com '+(d.nomeConjuge||'_____________').toUpperCase()+', '+(d.nacionalidadeConjuge||'brasileiro(a)')+', '+(d.profissaoConjuge||'_____________')+
+    ', '+portadorConj+' CI/RG nº '+(d.rgConjuge||'_____________')+'-'+(d.orgaoEmissorConjuge||'SSP')+'/'+(d.rgUFConjuge||'PR')+' e CPF nº '+(d.cpfConjuge||'_____________');
+  }
   const bin=atob(TEMPLATE_DOCX);
   const arr=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
@@ -93,16 +105,9 @@ async function gerarDocxReal(d){
   const subs=[
     ['a proprietária, ',propri+', '],
     ['MARIA DOMINGUES DOS SANTOS',(d.nome||'_________________________').toUpperCase()],
-    ['brasileira, viúva, aposentada, portadora CI/RG nº 26.873.295-4-SSP/SP e CPF nº ',
-     (d.nacionalidade||'brasileiro(a)')+', '+(d.estadoCivil||'_____________')+
-     ((d.estadoCivil==='casado(a)'||d.estadoCivil==='união estável')&&d.nomeConjuge?
-      ' sob regime de '+(d.regimeCasamento||'_____________')+' em '+(d.dataCasamento||'_____________')+
-      ' com '+(d.nomeConjuge||'_____________').toUpperCase()+', '+(d.nacionalidadeConjuge||'brasileiro(a)')+
-      ', '+(d.profissaoConjuge||'_____________')+', portador'+(d.genero==='feminino'?'a':'')+
-      ' CI/RG nº '+(d.rgConjuge||'_____________')+' e CPF nº '+(d.cpfConjuge||'_____________')+',':'')+
-     ' '+(d.profissao||'_____________')+', '+portador+' CI/RG nº '+(d.rg||'_____________')+' e CPF nº '],
+    ['brasileira, viúva, aposentada, portadora CI/RG nº 26.873.295-4-SSP/SP e CPF nº ',contratanteTexto],
     ['599.542.489-00, residente e domiciliada na Rua Piraí, nº 60, centro, Mamborê/PR',
-     (d.cpf||'_____________')+', residente e '+domiciliad+' na '+(d.endereco||'_____________')+', '+(d.cidade||'Mamborê/PR')],
+     (hasSpouse?spouseTexto:(d.cpf||'_____________'))+', '+residente+' na '+(d.endereco||'_____________')+', '+(d.cidade||'Mamborê/PR')],
     [', CEP: 87340-000,',', CEP: '+(d.cep||'87340-000')+','],
     ['declara não possuir, telefone: (44) 99892-3464, adiante denominada simplesmente de ',
      (d.email||'declara não possuir')+', telefone: '+(d.telefone||'(__)_____-____')+', adiante '+denominad+' de '],
@@ -130,15 +135,21 @@ async function gerarDocxReal(d){
 
 function gerarPreviewTexto(d){
   const f=d.genero==='feminino';
+  const hasSpouse=(d.estadoCivil==='casado(a)'||d.estadoCivil==='união estável');
   const items=[
     ['Nome',d.nome],['Gênero',d.genero==='feminino'?'Feminino (A Contratante)':d.genero==='masculino'?'Masculino (O Contratante)':'Plural (Os Contratantes)'],
-    ['Nacionalidade',d.nacionalidade],['Estado Civil',d.estadoCivil],['Profissão',d.profissao],
-    ...((d.estadoCivil==='casado(a)'||d.estadoCivil==='união estável')?[
+    ['Nacionalidade',d.nacionalidade],['Profissão',d.profissao],
+    ['Portador(a)',d.portadorGenero],
+    ['RG',d.rg?(d.rg+'-'+(d.orgaoEmissor||'SSP')+'/'+(d.rgUF||'PR')):d.rg],
+    ['CPF',d.cpf],['Estado Civil',d.estadoCivil],
+    ...(hasSpouse?[
       ['Regime de Casamento',d.regimeCasamento],['Data do Casamento',d.dataCasamento],
       ['Nome do Cônjuge',d.nomeConjuge],['Nacionalidade Cônjuge',d.nacionalidadeConjuge],
-      ['Profissão Cônjuge',d.profissaoConjuge],['RG Cônjuge',d.rgConjuge],['CPF Cônjuge',d.cpfConjuge]
+      ['Profissão Cônjuge',d.profissaoConjuge],['Portador(a) Cônjuge',d.portadorGeneroConjuge],
+      ['RG Cônjuge',d.rgConjuge?(d.rgConjuge+'-'+(d.orgaoEmissorConjuge||'SSP')+'/'+(d.rgUFConjuge||'PR')):d.rgConjuge],
+      ['CPF Cônjuge',d.cpfConjuge]
     ]:[]),
-    ['RG',d.rg],['CPF',d.cpf],['Endereço',d.endereco],['Cidade',d.cidade],['CEP',d.cep],
+    ['Endereço',d.endereco],['Cidade',d.cidade],['CEP',d.cep],
     ['E-mail',d.email],['Telefone',d.telefone],
     ['','<hr style="margin:10px 0"/>'],
     ['Data de Terras',d.dataTerraN?`nº ${d.dataTerraN} (${d.dataTerraNExtenso})`:''],
@@ -208,9 +219,10 @@ function G4Investimoveis(){
   const[showGerador,setShowGerador]=useState(false);
   const[showPreview,setShowPreview]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
-    genero:'feminino',nome:'',nacionalidade:'brasileira',estadoCivil:'',profissao:'',
-    regimeCasamento:'',dataCasamento:'',nomeConjuge:'',nacionalidadeConjuge:'brasileiro(a)',profissaoConjuge:'',rgConjuge:'',cpfConjuge:''
-,rg:'',cpf:'',
+    genero:'feminino',nome:'',nacionalidade:'brasileira',profissao:'',portadorGenero:'portadora',
+    rg:'',orgaoEmissor:'SSP',rgUF:'PR',cpf:'',estadoCivil:'',
+    regimeCasamento:'',dataCasamento:'',nomeConjuge:'',nacionalidadeConjuge:'brasileiro(a)',profissaoConjuge:'',
+    portadorGeneroConjuge:'portador',rgConjuge:'',orgaoEmissorConjuge:'SSP',rgUFConjuge:'PR',cpfConjuge:'',
     endereco:'',cidade:'Mamborê/PR',cep:'87340-000',email:'',telefone:'',
     dataTerraN:'',dataTerraNExtenso:'',quadraN:'',quadraNExtenso:'',areaM2:'',
     enderecoImovel:'',cidadeImovel:'Mamborê/PR',matricula:'',livro:'',
@@ -540,18 +552,18 @@ function G4Investimoveis(){
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between p-4 bg-gray-800">
+              <div className="flex items-center justify-between p-5 bg-gray-800">
                 <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
-                <h2 className="text-lg font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
                 <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
               </div>
-              <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase">{d}</div>)}</div>
+              <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-4 text-center text-sm md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
               <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
                 const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
                 const isH=ds===hojeStr;const isS=diaSelecionado===ds;
-                return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[80px] md:min-h-[100px] p-1.5 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
-                  {dia&&<><div className="flex items-center justify-between"><span className={`text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-700'}`}>{dia}</span></div>
-                  <div className="mt-1 space-y-0.5">{tD.slice(0,2).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-700':'bg-blue-100 text-blue-700'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>2&&<span className="text-xs text-gray-400 pl-1">+{tD.length-2}</span>}</div></>}
+                return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[100px] md:min-h-[120px] p-1.5 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
+                  {dia&&<><div className="flex items-center justify-between"><span className={`text-base md:text-lg font-semibold w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
+                  <div className="mt-1 space-y-0.5">{tD.slice(0,2).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-0.5 rounded truncate cursor-pointer font-medium ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>2&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-2}</span>}</div></>}
                 </div>);
               })}</div>
             </div>
@@ -690,10 +702,26 @@ function G4Investimoveis(){
               <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome} onChange={e=>setDadosContrato({...dadosContrato,nome:e.target.value})} placeholder="Ex: Maria Domingues dos Santos" className={inputCls}/></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade:e.target.value})} className={inputCls}/></div>
-                <div><label className={labelCls}>Estado Civil</label><select value={dadosContrato.estadoCivil} onChange={e=>setDadosContrato({...dadosContrato,estadoCivil:e.target.value})} className={inputCls}>
-                  <option value="">Selecione</option><option>solteiro(a)</option><option>casado(a)</option><option>divorciado(a)</option><option>viúvo(a)</option><option>união estável</option>
+                <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: aposentada" className={inputCls}/></div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className={labelCls}>Portador(a)</label><select value={dadosContrato.portadorGenero} onChange={e=>setDadosContrato({...dadosContrato,portadorGenero:e.target.value})} className={inputCls}>
+                  <option value="portador">portador</option><option value="portadora">portadora</option>
+                </select></div>
+                <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg} onChange={e=>setDadosContrato({...dadosContrato,rg:e.target.value})} placeholder="Ex: 425778-4" className={inputCls}/></div>
+                <div><label className={labelCls}>Órgão Emissor</label><select value={dadosContrato.orgaoEmissor} onChange={e=>setDadosContrato({...dadosContrato,orgaoEmissor:e.target.value})} className={inputCls}>
+                  {['SSP','SESP','IFP','PC','DETRAN','PM','CBM','CREA','CRM','OAB','Outro'].map(o=><option key={o} value={o}>{o}</option>)}
                 </select></div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={labelCls}>UF do RG</label><select value={dadosContrato.rgUF} onChange={e=>setDadosContrato({...dadosContrato,rgUF:e.target.value})} className={inputCls}>
+                  {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map(u=><option key={u} value={u}>{u}</option>)}
+                </select></div>
+                <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpf} onChange={e=>setDadosContrato({...dadosContrato,cpf:e.target.value})} placeholder="Ex: 117.793.719-00" className={inputCls}/></div>
+              </div>
+              <div><label className={labelCls}>Estado Civil</label><select value={dadosContrato.estadoCivil} onChange={e=>setDadosContrato({...dadosContrato,estadoCivil:e.target.value})} className={inputCls}>
+                <option value="">Selecione</option><option>solteiro(a)</option><option>casado(a)</option><option>divorciado(a)</option><option>viúvo(a)</option><option>união estável</option>
+              </select></div>
               {/* Seção Condicional: Dados do Cônjuge */}
               {(dadosContrato.estadoCivil==='casado(a)'||dadosContrato.estadoCivil==='união estável')&&(
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
@@ -701,23 +729,29 @@ function G4Investimoveis(){
                   <div><label className={labelCls}>Regime de Casamento</label><select value={dadosContrato.regimeCasamento} onChange={e=>setDadosContrato({...dadosContrato,regimeCasamento:e.target.value})} className={inputCls}>
                     <option value="">Selecione</option><option>comunhão parcial de bens</option><option>comunhão universal de bens</option><option>separação total de bens</option><option>participação final nos aquestos</option>
                   </select></div>
-                  <div><label className={labelCls}>Data do Casamento</label><input type="text" value={dadosContrato.dataCasamento} onChange={e=>setDadosContrato({...dadosContrato,dataCasamento:e.target.value})} placeholder="Ex: 15 de janeiro de 2003" className={inputCls}/></div>
-                  <div><label className={labelCls}>Nome Completo do Cônjuge</label><input type="text" value={dadosContrato.nomeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nomeConjuge:e.target.value})} placeholder="Ex: João Carlos dos Santos" className={inputCls}/></div>
+                  <div><label className={labelCls}>Data do Casamento</label><input type="text" value={dadosContrato.dataCasamento} onChange={e=>setDadosContrato({...dadosContrato,dataCasamento:e.target.value})} placeholder="Ex: 15/01/2015" className={inputCls}/></div>
+                  <div><label className={labelCls}>Nome Completo do Cônjuge</label><input type="text" value={dadosContrato.nomeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nomeConjuge:e.target.value})} placeholder="Ex: Lucas de Souza Vieira" className={inputCls}/></div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidadeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nacionalidadeConjuge:e.target.value})} className={inputCls}/></div>
-                    <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissaoConjuge} onChange={e=>setDadosContrato({...dadosContrato,profissaoConjuge:e.target.value})} placeholder="Ex: aposentado" className={inputCls}/></div>
+                    <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissaoConjuge} onChange={e=>setDadosContrato({...dadosContrato,profissaoConjuge:e.target.value})} placeholder="Ex: Autonomo" className={inputCls}/></div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div><label className={labelCls}>Portador(a)</label><select value={dadosContrato.portadorGeneroConjuge} onChange={e=>setDadosContrato({...dadosContrato,portadorGeneroConjuge:e.target.value})} className={inputCls}>
+                      <option value="portador">portador</option><option value="portadora">portadora</option>
+                    </select></div>
+                    <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rgConjuge} onChange={e=>setDadosContrato({...dadosContrato,rgConjuge:e.target.value})} placeholder="Ex: 1458787-7" className={inputCls}/></div>
+                    <div><label className={labelCls}>Órgão Emissor</label><select value={dadosContrato.orgaoEmissorConjuge} onChange={e=>setDadosContrato({...dadosContrato,orgaoEmissorConjuge:e.target.value})} className={inputCls}>
+                      {['SSP','SESP','IFP','PC','DETRAN','PM','CBM','CREA','CRM','OAB','Outro'].map(o=><option key={o} value={o}>{o}</option>)}
+                    </select></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rgConjuge} onChange={e=>setDadosContrato({...dadosContrato,rgConjuge:e.target.value})} placeholder="Ex: 12.345.678-9-SSP/SP" className={inputCls}/></div>
-                    <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpfConjuge} onChange={e=>setDadosContrato({...dadosContrato,cpfConjuge:e.target.value})} placeholder="Ex: 123.456.789-00" className={inputCls}/></div>
+                    <div><label className={labelCls}>UF do RG</label><select value={dadosContrato.rgUFConjuge} onChange={e=>setDadosContrato({...dadosContrato,rgUFConjuge:e.target.value})} className={inputCls}>
+                      {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map(u=><option key={u} value={u}>{u}</option>)}
+                    </select></div>
+                    <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpfConjuge} onChange={e=>setDadosContrato({...dadosContrato,cpfConjuge:e.target.value})} placeholder="Ex: 117.793.719-00" className={inputCls}/></div>
                   </div>
                 </div>
               )}
-              <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: aposentada" className={inputCls}/></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg} onChange={e=>setDadosContrato({...dadosContrato,rg:e.target.value})} placeholder="Ex: 26.873.295-4-SSP/SP" className={inputCls}/></div>
-                <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpf} onChange={e=>setDadosContrato({...dadosContrato,cpf:e.target.value})} placeholder="Ex: 599.542.489-00" className={inputCls}/></div>
-              </div>
               <div><label className={labelCls}>Endereço</label><input type="text" value={dadosContrato.endereco} onChange={e=>setDadosContrato({...dadosContrato,endereco:e.target.value})} placeholder="Rua, nº, bairro" className={inputCls}/></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={labelCls}>Cidade/UF</label><input type="text" value={dadosContrato.cidade} onChange={e=>setDadosContrato({...dadosContrato,cidade:e.target.value})} className={inputCls}/></div>
