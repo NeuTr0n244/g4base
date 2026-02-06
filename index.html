@@ -668,7 +668,15 @@ function G4Investimoveis(){
         {/* Lista de Contratos */}
         <h3 className="text-lg font-bold text-gray-800 mb-4">Contratos Ativos</h3>
         <div className="grid gap-4">
-          {contratos.sort((a,b)=>diasRestantes(a.dataVencimento)-diasRestantes(b.dataVencimento)).map(c=>{
+          {contratos.sort((a,b)=>{
+            const progA=getChecklistProgress(a);
+            const progB=getChecklistProgress(b);
+            if(progA.isCompleto===progB.isCompleto){
+              if(progA.isCompleto)return 0;
+              return progA.completos-progB.completos;
+            }
+            return progA.isCompleto?1:-1;
+          }).map(c=>{
             const dr=diasRestantes(c.dataVencimento);const badge=getStatusBadge(c);
             const prog=getChecklistProgress(c);
             const isExp=contratosExpandidos[c.id];
