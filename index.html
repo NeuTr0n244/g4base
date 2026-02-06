@@ -219,7 +219,7 @@ function G4Investimoveis(){
   const[showGerador,setShowGerador]=useState(false);
   const[showPreview,setShowPreview]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
-    genero:'feminino',nome:'',nacionalidade:'brasileira',profissao:'',portadorGenero:'portadora',
+    tipoImovel:'',genero:'feminino',nome:'',nacionalidade:'brasileira',profissao:'',portadorGenero:'portadora',
     rg:'',orgaoEmissor:'SSP',rgUF:'PR',cpf:'',estadoCivil:'',
     regimeCasamento:'',dataCasamento:'',nomeConjuge:'',nacionalidadeConjuge:'brasileiro(a)',profissaoConjuge:'',
     portadorGeneroConjuge:'portador',rgConjuge:'',orgaoEmissorConjuge:'SSP',rgUFConjuge:'PR',cpfConjuge:'',
@@ -467,15 +467,15 @@ function G4Investimoveis(){
                 </div>
               )}
             </div>
-            {abaAtiva==='home'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-            {abaAtiva==='calendario'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
+            {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
+            {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
             {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo'});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Contrato</button>}
           </div>
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex gap-0">
-          {[{k:'home',l:'Home',I:Icons.Home,b:0},{k:'calendario',l:'Calendário',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length}].map(t=>(
+          {[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length}].map(t=>(
             <button key={t.k} onClick={()=>setAbaAtiva(t.k)}
               className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
               <t.I/>{t.l}
@@ -488,6 +488,64 @@ function G4Investimoveis(){
 
     {/* ====== ABA HOME ====== */}
     {abaAtiva==='home'&&(
+      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+        {tarefasAtrasadas.length>0&&<div className="bg-red-500 text-white py-2.5 px-4 rounded-xl mb-4"><div className="flex items-center gap-2 text-sm"><Icons.AlertTriangle/><span className="font-semibold">Atenção!</span> {tarefasAtrasadas.length} tarefa(s) atrasada(s)</div></div>}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between p-5 bg-gray-800">
+                <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
+                <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
+                <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
+              </div>
+              <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-4 text-center text-sm md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
+              <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
+                const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
+                const isH=ds===hojeStr;const isS=diaSelecionado===ds;
+                return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[120px] md:min-h-[140px] p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
+                  {dia&&<><div className="flex items-center justify-between"><span className={`text-base md:text-lg font-semibold w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
+                  <div className="mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-1 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div></>}
+                </div>);
+              })}</div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 className="font-bold text-gray-800">{diaSelecionado?`Tarefas - ${fmtData(diaSelecionado)}`:'Selecione um dia'}</h3>
+                {diaSelecionado&&<button onClick={()=>abrirNovaTarefa(parseInt(diaSelecionado.split('-')[2]))} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Icons.Plus/></button>}
+              </div>
+              <div className="p-4 max-h-[300px] overflow-y-auto">{diaSelecionado?(()=>{
+                const tD=tarefas.filter(t=>t.data===diaSelecionado).sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+                return tD.length>0?tD.map(t=><div key={t.id} className={`p-3 rounded-lg mb-2 border ${t.concluida?'bg-gray-50 border-gray-200':t.data<hojeStr?'bg-red-50 border-red-200':'bg-white border-gray-200'}`}>
+                  <div className="flex items-start justify-between gap-2"><div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <button onClick={()=>toggleConcluida(t.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${t.concluida?'bg-green-500 border-green-500 text-white':'border-gray-300 hover:border-green-500'}`}>{t.concluida&&<Icons.Check/>}</button>
+                      <span className={`font-medium text-sm ${t.concluida?'line-through text-gray-400':'text-gray-800'}`}>{t.titulo}</span>
+                    </div>
+                    {t.descricao&&<p className="text-xs text-gray-500 mt-1 ml-7">{t.descricao}</p>}
+                    <div className="flex items-center gap-2 mt-1.5 ml-7">{t.hora&&<span className="text-xs text-gray-400 flex items-center gap-1"><Icons.Clock/>{t.hora}</span>}<span className={`text-xs px-2 py-0.5 rounded-full text-white ${getPC(t.prioridade)}`}>{getPL(t.prioridade)}</span></div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0"><button onClick={()=>editarTarefa(t)} className="p-1 text-gray-400 hover:text-blue-500"><Icons.Edit2/></button><button onClick={()=>deletarTarefa(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Icons.Trash2/></button></div>
+                  </div></div>):<p className="text-gray-400 text-sm text-center py-4">Nenhuma tarefa</p>;
+              })():<p className="text-gray-400 text-sm text-center py-4">Clique em um dia</p>}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Resumo</h3></div>
+              <div className="p-4 space-y-2">
+                <div className="flex justify-between"><span className="text-sm text-gray-500">Total</span><span className="font-semibold">{tarefas.length}</span></div>
+                <div className="flex justify-between"><span className="text-sm text-gray-500">Concluídas</span><span className="font-semibold text-green-600">{tarefas.filter(t=>t.concluida).length}</span></div>
+                <div className="flex justify-between"><span className="text-sm text-gray-500">Pendentes</span><span className="font-semibold text-amber-600">{tarefasPendentes}</span></div>
+                <div className="flex justify-between"><span className="text-sm text-red-500 font-medium">Atrasadas</span><span className="font-semibold text-red-600">{tarefasAtrasadas.length}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    )}
+
+    {/* ====== ABA CLIENTES ====== */}
+    {abaAtiva==='clientes'&&(
       <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[{l:'Total Clientes',v:stats.total,c:'red',I:Icons.Users},{l:'Locação',v:stats.locacao,c:'emerald',I:Icons.Home},{l:'Compra',v:stats.compra,c:'blue',I:Icons.Building2},{l:'Venda',v:stats.venda,c:'amber',I:Icons.TrendingUp}].map((s,i)=>(
@@ -542,64 +600,6 @@ function G4Investimoveis(){
           ))}
         </div>
         {clientesFiltrados.length===0&&<div className="text-center py-16"><div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icons.Search/></div><p className="text-gray-600 text-lg">Nenhum cliente encontrado</p></div>}
-      </main>
-    )}
-
-    {/* ====== ABA CALENDÁRIO ====== */}
-    {abaAtiva==='calendario'&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
-        {tarefasAtrasadas.length>0&&<div className="bg-red-500 text-white py-2.5 px-4 rounded-xl mb-4"><div className="flex items-center gap-2 text-sm"><Icons.AlertTriangle/><span className="font-semibold">Atenção!</span> {tarefasAtrasadas.length} tarefa(s) atrasada(s)</div></div>}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between p-5 bg-gray-800">
-                <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
-                <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
-                <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
-              </div>
-              <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-4 text-center text-sm md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
-              <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
-                const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
-                const isH=ds===hojeStr;const isS=diaSelecionado===ds;
-                return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[120px] md:min-h-[140px] p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
-                  {dia&&<><div className="flex items-center justify-between"><span className={`text-base md:text-lg font-semibold w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
-                  <div className="mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-1 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div></>}
-                </div>);
-              })}</div>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="font-bold text-gray-800">{diaSelecionado?`Tarefas - ${fmtData(diaSelecionado)}`:'Selecione um dia'}</h3>
-                {diaSelecionado&&<button onClick={()=>abrirNovaTarefa(parseInt(diaSelecionado.split('-')[2]))} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Icons.Plus/></button>}
-              </div>
-              <div className="p-4 max-h-[300px] overflow-y-auto">{diaSelecionado?(()=>{
-                const tD=tarefas.filter(t=>t.data===diaSelecionado).sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
-                return tD.length>0?tD.map(t=><div key={t.id} className={`p-3 rounded-lg mb-2 border ${t.concluida?'bg-gray-50 border-gray-200':t.data<hojeStr?'bg-red-50 border-red-200':'bg-white border-gray-200'}`}>
-                  <div className="flex items-start justify-between gap-2"><div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <button onClick={()=>toggleConcluida(t.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${t.concluida?'bg-green-500 border-green-500 text-white':'border-gray-300 hover:border-green-500'}`}>{t.concluida&&<Icons.Check/>}</button>
-                      <span className={`font-medium text-sm ${t.concluida?'line-through text-gray-400':'text-gray-800'}`}>{t.titulo}</span>
-                    </div>
-                    {t.descricao&&<p className="text-xs text-gray-500 mt-1 ml-7">{t.descricao}</p>}
-                    <div className="flex items-center gap-2 mt-1.5 ml-7">{t.hora&&<span className="text-xs text-gray-400 flex items-center gap-1"><Icons.Clock/>{t.hora}</span>}<span className={`text-xs px-2 py-0.5 rounded-full text-white ${getPC(t.prioridade)}`}>{getPL(t.prioridade)}</span></div>
-                  </div>
-                  <div className="flex gap-1 flex-shrink-0"><button onClick={()=>editarTarefa(t)} className="p-1 text-gray-400 hover:text-blue-500"><Icons.Edit2/></button><button onClick={()=>deletarTarefa(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Icons.Trash2/></button></div>
-                  </div></div>):<p className="text-gray-400 text-sm text-center py-4">Nenhuma tarefa</p>;
-              })():<p className="text-gray-400 text-sm text-center py-4">Clique em um dia</p>}</div>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-              <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Resumo</h3></div>
-              <div className="p-4 space-y-2">
-                <div className="flex justify-between"><span className="text-sm text-gray-500">Total</span><span className="font-semibold">{tarefas.length}</span></div>
-                <div className="flex justify-between"><span className="text-sm text-gray-500">Concluídas</span><span className="font-semibold text-green-600">{tarefas.filter(t=>t.concluida).length}</span></div>
-                <div className="flex justify-between"><span className="text-sm text-gray-500">Pendentes</span><span className="font-semibold text-amber-600">{tarefasPendentes}</span></div>
-                <div className="flex justify-between"><span className="text-sm text-red-500 font-medium">Atrasadas</span><span className="font-semibold text-red-600">{tarefasAtrasadas.length}</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
     )}
 
@@ -692,6 +692,13 @@ function G4Investimoveis(){
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Icons.Users/>Dados do Contratante</h3>
             <div className="space-y-3">
+              <div><label className={labelCls}>Tipo de Imóvel</label>
+                <div className="flex gap-3">
+                  {[{v:'CASA',l:'CASA'},{v:'TERRENO',l:'TERRENO'}].map(t=>(
+                    <button key={t.v} onClick={()=>setDadosContrato({...dadosContrato,tipoImovel:t.v})} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${dadosContrato.tipoImovel===t.v?'border-orange-500 bg-orange-50 text-orange-700':'border-gray-200 bg-gray-50 text-gray-500'}`}>{t.l}</button>
+                  ))}
+                </div>
+              </div>
               <div><label className={labelCls}>Tratamento</label>
                 <div className="flex gap-3">
                   {[{v:'feminino',l:'A Contratante'},{v:'masculino',l:'O Contratante'},{v:'plural',l:'Os Contratantes'}].map(g=>(
