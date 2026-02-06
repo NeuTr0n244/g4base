@@ -215,7 +215,8 @@ function G4Investimoveis(){
   const[contratos,setContratos]=useState([]);
   const[showContratoModal,setShowContratoModal]=useState(false);
   const[editingContrato,setEditingContrato]=useState(null);
-  const[novoContrato,setNovoContrato]=useState({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo'});
+  const[novoContrato,setNovoContrato]=useState({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false]});
+  const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[showGerador,setShowGerador]=useState(false);
   const[showPreview,setShowPreview]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
@@ -384,9 +385,29 @@ function G4Investimoveis(){
 
   const handleAddContrato=async()=>{
     if(!novoContrato.cliente)return;
-    const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now()};
+    const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now(),checklist:[false,false,false,false,false,false,false,false,false]};
     await fsAdd('contratos',item);
-    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo'});
+    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false]});
+  };
+
+  const checklistItems=['Contrato assinado','Assinatura coletada','Placa colocada','Fotos do imóvel','Publicado no site','Descritivo feito','Mapa de localização','Código gerado','Pasta arquivada'];
+
+  const getChecklistProgress=(c)=>{
+    const cl=c.checklist||[false,false,false,false,false,false,false,false,false];
+    const total=cl.length;
+    const completos=cl.filter(Boolean).length;
+    return{completos,total,isCompleto:completos===total};
+  };
+
+  const toggleChecklistItem=async(contrato,index)=>{
+    const cl=[...(contrato.checklist||[false,false,false,false,false,false,false,false,false])];
+    cl[index]=!cl[index];
+    const updated={...contrato,checklist:cl};
+    await fsAdd('contratos',updated);
+  };
+
+  const toggleExpandContrato=(id)=>{
+    setContratosExpandidos(prev=>({...prev,[id]:!prev[id]}));
   };
 
   const getStatusColor=(c)=>{
@@ -469,7 +490,7 @@ function G4Investimoveis(){
             </div>
             {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
             {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo'});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Contrato</button>}
+            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false]});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Contrato</button>}
           </div>
         </div>
       </div>
@@ -649,30 +670,79 @@ function G4Investimoveis(){
         <div className="grid gap-4">
           {contratos.sort((a,b)=>diasRestantes(a.dataVencimento)-diasRestantes(b.dataVencimento)).map(c=>{
             const dr=diasRestantes(c.dataVencimento);const badge=getStatusBadge(c);
+            const prog=getChecklistProgress(c);
+            const isExp=contratosExpandidos[c.id];
             return(
-            <div key={c.id} className={`rounded-xl p-5 border shadow-sm transition-all ${getStatusColor(c)}`}>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold">{c.cliente}</h3>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
-                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
+            <div key={c.id} className={`rounded-xl border shadow-sm transition-all ${getStatusColor(c)}`}>
+              {/* Header do Card */}
+              <div className="p-5 cursor-pointer" onClick={()=>toggleExpandContrato(c.id)}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold">{c.cliente}</h3>
+                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
+                      <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
+                      <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
+                        {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm opacity-80">
+                      <span className="flex items-center gap-1.5"><Icons.Building2/>{c.imovel}</span>
+                      <span className="flex items-center gap-1.5"><Icons.DollarSign/>{c.valor}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-xs mt-2 opacity-70">
+                      <span>Início: {fmtData(c.dataInicio)}</span>
+                      <span>Vencimento: {fmtData(c.dataVencimento)}</span>
+                      {c.status==='ativo'&&dr>0&&<span className="font-semibold">{dr} dias restantes</span>}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-4 text-sm opacity-80">
-                    <span className="flex items-center gap-1.5"><Icons.Building2/>{c.imovel}</span>
-                    <span className="flex items-center gap-1.5"><Icons.DollarSign/>{c.valor}</span>
+                  <div className="flex gap-2 items-center">
+                    <button onClick={(e)=>{e.stopPropagation();setEditingContrato(c);setNovoContrato(c);setShowContratoModal(true);}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors" title="Editar"><Icons.Edit2/></button>
+                    <button onClick={async(e)=>{e.stopPropagation();if(confirm('Excluir contrato?')){await fsDel('contratos',c._docId||String(c.id));}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
+                    <button className="p-2 text-gray-600 transition-transform" style={{transform:isExp?'rotate(180deg)':'rotate(0deg)'}}>
+                      <Icons.ChevronDown/>
+                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-4 text-xs mt-2 opacity-70">
-                    <span>Início: {fmtData(c.dataInicio)}</span>
-                    <span>Vencimento: {fmtData(c.dataVencimento)}</span>
-                    {c.status==='ativo'&&dr>0&&<span className="font-semibold">{dr} dias restantes</span>}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={()=>{setEditingContrato(c);setNovoContrato(c);setShowContratoModal(true);}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors" title="Editar"><Icons.Edit2/></button>
-                  <button onClick={async()=>{if(confirm('Excluir contrato?')){await fsDel('contratos',c._docId||String(c.id));}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
                 </div>
               </div>
+              {/* Checklist Expansível */}
+              {isExp&&(
+                <div className="border-t px-5 pb-5 pt-3 bg-white/30 animate-in slide-in-from-top duration-200">
+                  <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                    <Icons.FileText className="w-4 h-4"/>
+                    Checklist de Documentação
+                  </h4>
+                  <div className="space-y-2">
+                    {checklistItems.map((item,idx)=>{
+                      const checked=(c.checklist||[])[idx]||false;
+                      return(
+                        <label key={idx} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/50 cursor-pointer transition-colors group">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e)=>{e.stopPropagation();toggleChecklistItem(c,idx);}}
+                            className="w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0 cursor-pointer"
+                          />
+                          <span className={`text-sm flex-1 ${checked?'line-through text-gray-500':'text-gray-800 font-medium'}`}>
+                            {item}
+                          </span>
+                          {checked&&<span className="text-green-600 text-sm font-bold">✓</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {/* Barra de Progresso */}
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+                      <span className="font-semibold">Progresso</span>
+                      <span className="font-bold">{prog.completos}/{prog.total} ({Math.round(prog.completos/prog.total*100)}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${prog.isCompleto?'bg-green-500':'bg-amber-500'}`} style={{width:`${(prog.completos/prog.total)*100}%`}}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>);
           })}
         </div>
