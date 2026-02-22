@@ -220,7 +220,7 @@ function G4Investimoveis(){
   const[contratos,setContratos]=useState([]);
   const[showContratoModal,setShowContratoModal]=useState(false);
   const[editingContrato,setEditingContrato]=useState(null);
-  const[novoContrato,setNovoContrato]=useState({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+  const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[buscaContrato,setBuscaContrato]=useState('');
   const[showGerador,setShowGerador]=useState(false);
@@ -412,7 +412,7 @@ function G4Investimoveis(){
     if(!novoContrato.cliente)return;
     const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now(),checklist:[false,false,false,false,false,false,false,false,false]};
     await fsAdd('contratos',item);
-    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
   };
 
   const handleImageUpload=async(contrato,file)=>{
@@ -526,7 +526,7 @@ function G4Investimoveis(){
             </div>
             {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
             {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
+            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
             {abaAtiva==='emAndamento'&&<button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Gerar Novo Contrato</button>}
           </div>
         </div>
@@ -872,12 +872,12 @@ function G4Investimoveis(){
                             {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
                           </span>
                         </div>
-                        <div className="text-sm font-semibold text-gray-600 mb-2">Código {c.codigoRef||String(c.id).padStart(3,'0')}</div>
-                        <div className="flex flex-wrap gap-4 text-sm opacity-80">
-                          <span className="flex items-center gap-1.5"><Icons.Building2/>{c.imovel}</span>
-                          <span className="flex items-center gap-1.5"><Icons.DollarSign/>{c.valor}</span>
+                        <div className="text-xl font-bold text-green-600 mb-2">{c.valor||'R$ —'}</div>
+                        <div className="text-sm text-gray-500 mb-2">Código {c.codigoRef||String(c.id).padStart(3,'0')}</div>
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-2">
+                          <Icons.MapPin className="w-4 h-4"/>
+                          {c.endereco||c.imovel||'—'}
                         </div>
-                        {c.endereco&&<div className="flex items-center gap-1.5 text-sm opacity-80 mt-2"><Icons.MapPin className="w-4 h-4"/>{c.endereco}</div>}
                         <div className="flex flex-wrap gap-4 text-xs mt-2 opacity-70">
                           <span>Início: {fmtData(c.dataInicio)}</span>
                           <span>Vencimento: {fmtData(c.dataVencimento)}</span>
@@ -1235,8 +1235,7 @@ function G4Investimoveis(){
         </div>
         <div><label className={labelCls}>Cliente *</label><input type="text" value={novoContrato.cliente} onChange={e=>setNovoContrato({...novoContrato,cliente:e.target.value})} placeholder="Nome do cliente" className={inputCls}/></div>
         <div><label className={labelCls}>Código de Referência</label><input type="text" value={novoContrato.codigoRef||''} onChange={e=>setNovoContrato({...novoContrato,codigoRef:e.target.value})} placeholder="Ex: CON-001" className={inputCls}/></div>
-        <div><label className={labelCls}>Imóvel</label><input type="text" value={novoContrato.imovel} onChange={e=>setNovoContrato({...novoContrato,imovel:e.target.value})} placeholder="Identificação do imóvel" className={inputCls}/></div>
-        <div><label className={labelCls}>Endereço</label><input type="text" value={novoContrato.endereco||''} onChange={e=>setNovoContrato({...novoContrato,endereco:e.target.value})} placeholder="Endereço completo do imóvel" className={inputCls}/></div>
+        <div><label className={labelCls}>Endereço</label><input type="text" value={novoContrato.endereco||''} onChange={e=>setNovoContrato({...novoContrato,endereco:e.target.value})} placeholder="Ex: Rua Vereador Sidney Barth, nº 1.059" className={inputCls}/></div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className={labelCls}>Tipo</label><select value={novoContrato.tipo} onChange={e=>setNovoContrato({...novoContrato,tipo:e.target.value})} className={inputCls}><option>Venda</option><option>Locação</option><option>Permuta</option></select></div>
           <div><label className={labelCls}>Valor</label><input type="text" value={novoContrato.valor} onChange={e=>setNovoContrato({...novoContrato,valor:e.target.value})} placeholder="R$ 000,00" className={inputCls}/></div>
