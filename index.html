@@ -211,7 +211,7 @@ function G4Investimoveis(){
   const[tarefas,setTarefas]=useState([]);
   const[showTarefaModal,setShowTarefaModal]=useState(false);
   const[editingTarefa,setEditingTarefa]=useState(null);
-  const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false});
+  const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:''});
   const[diaSelecionado,setDiaSelecionado]=useState(null);
   const[showNotificacoes,setShowNotificacoes]=useState(false);
   const[notifsVistas,setNotifsVistas]=useState(0);
@@ -373,8 +373,26 @@ function G4Investimoveis(){
   const tarefasPendentes=useMemo(()=>tarefas.filter(t=>!t.concluida).length,[tarefas]);
   const mesAnterior=()=>{if(mesAtual===0){setMesAtual(11);setAnoAtual(anoAtual-1);}else setMesAtual(mesAtual-1);};
   const mesSeguinte=()=>{if(mesAtual===11){setMesAtual(0);setAnoAtual(anoAtual+1);}else setMesAtual(mesAtual+1);};
-  const abrirNovaTarefa=(dia)=>{const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';setNovaTarefa({titulo:'',descricao:'',data:ds,hora:'',prioridade:'media',concluida:false});setEditingTarefa(null);setShowTarefaModal(true);};
-  const handleAddTarefa=async()=>{if(!novaTarefa.titulo||!novaTarefa.data)return;const item=editingTarefa?{...novaTarefa,id:editingTarefa.id}:{...novaTarefa,id:Date.now()};await fsAdd('tarefas',item);setShowTarefaModal(false);setEditingTarefa(null);};
+  const abrirNovaTarefa=(dia)=>{const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';setNovaTarefa({titulo:'',descricao:'',data:ds,hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:''});setEditingTarefa(null);setShowTarefaModal(true);};
+  const handleAddTarefa=async()=>{
+    if(!novaTarefa.titulo||!novaTarefa.data)return;
+    if(novaTarefa.repetir&&novaTarefa.dataFinal&&!editingTarefa){
+      const dataInicio=new Date(novaTarefa.data);
+      const dataFim=new Date(novaTarefa.dataFinal);
+      const dia=dataInicio.getDate();
+      let atual=new Date(dataInicio);
+      while(atual<=dataFim){
+        const tarefaMes={...novaTarefa,id:Date.now()+Math.random(),data:atual.toISOString().split('T')[0],repetir:false,dataFinal:''};
+        await fsAdd('tarefas',tarefaMes);
+        atual.setMonth(atual.getMonth()+1);
+        atual.setDate(dia);
+      }
+    }else{
+      const item=editingTarefa?{...novaTarefa,id:editingTarefa.id}:{...novaTarefa,id:Date.now()};
+      await fsAdd('tarefas',item);
+    }
+    setShowTarefaModal(false);setEditingTarefa(null);
+  };
   const toggleConcluida=async(id)=>{const t=tarefas.find(x=>x.id===id);if(!t)return;await fsAdd('tarefas',{...t,concluida:!t.concluida});};
   const editarTarefa=(t)=>{setEditingTarefa(t);setNovaTarefa(t);setShowTarefaModal(true);};
   const deletarTarefa=async(id)=>{if(confirm('Excluir?')){const t=tarefas.find(x=>x.id===id);if(t)await fsDel('tarefas',t._docId||String(t.id));}};
@@ -823,18 +841,14 @@ function G4Investimoveis(){
               <div className="p-5">
                 <div className="flex gap-4">
                   {/* Imagem do Contrato */}
-                  <div className="flex-shrink-0 relative group">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-gray-200">
+                  <div className="flex-shrink-0">
+                    <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-gray-200">
                       {c.imagemUrl?(
                         <img src={c.imagemUrl} alt={c.cliente} className="w-full h-full object-cover"/>
                       ):(
-                        <Icons.Home className="w-10 h-10 text-gray-400"/>
+                        <Icons.Home className="w-12 h-12 text-gray-400"/>
                       )}
                     </div>
-                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-xl">
-                      <Icons.Camera className="w-6 h-6 text-white"/>
-                      <input type="file" accept="image/*" className="hidden" onChange={(e)=>{if(e.target.files[0])handleImageUpload(c,e.target.files[0]);}}/>
-                    </label>
                   </div>
 
                   {/* Conteúdo do Card */}
@@ -849,7 +863,7 @@ function G4Investimoveis(){
                             {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
                           </span>
                         </div>
-                        {c.codigoRef&&<div className="text-sm font-mono text-gray-600 mb-2">📋 {c.codigoRef}</div>}
+                        <div className="text-sm font-semibold text-gray-600 mb-2">Código {c.codigoRef||String(c.id).padStart(3,'0')}</div>
                         <div className="flex flex-wrap gap-4 text-sm opacity-80">
                           <span className="flex items-center gap-1.5"><Icons.Building2/>{c.imovel}</span>
                           <span className="flex items-center gap-1.5"><Icons.DollarSign/>{c.valor}</span>
@@ -1161,6 +1175,19 @@ function G4Investimoveis(){
         <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data *</label><input type="date" value={novaTarefa.data} onChange={e=>setNovaTarefa({...novaTarefa,data:e.target.value})} className={inputCls}/></div><div><label className={labelCls}>Horário</label><input type="time" value={novaTarefa.hora} onChange={e=>setNovaTarefa({...novaTarefa,hora:e.target.value})} className={inputCls}/></div></div>
         <div><label className={labelCls}>Prioridade</label><div className="flex gap-3">{[{v:'baixa',l:'Baixa',c:'border-green-500 bg-green-50 text-green-700'},{v:'media',l:'Média',c:'border-amber-500 bg-amber-50 text-amber-700'},{v:'alta',l:'Alta',c:'border-red-500 bg-red-50 text-red-700'}].map(p=><button key={p.v} onClick={()=>setNovaTarefa({...novaTarefa,prioridade:p.v})} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${novaTarefa.prioridade===p.v?p.c:'border-gray-200 bg-gray-50 text-gray-500'}`}>{p.l}</button>)}</div></div>
         <div><label className={labelCls}>Descrição</label><textarea value={novaTarefa.descricao} onChange={e=>setNovaTarefa({...novaTarefa,descricao:e.target.value})} rows={2} className={inputCls+" resize-none"} placeholder="Detalhes..."/></div>
+        {!editingTarefa&&<div className="border-t border-gray-200 pt-3">
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={novaTarefa.repetir||false} onChange={(e)=>setNovaTarefa({...novaTarefa,repetir:e.target.checked})} className="w-5 h-5 text-blue-500 rounded"/>
+            <label className="text-sm font-medium text-gray-700">Repetir mensalmente</label>
+          </div>
+          {novaTarefa.repetir&&novaTarefa.data&&(
+            <div className="mt-3">
+              <label className={labelCls}>Repetir até</label>
+              <input type="date" value={novaTarefa.dataFinal||''} onChange={(e)=>setNovaTarefa({...novaTarefa,dataFinal:e.target.value})} className={inputCls}/>
+              <p className="text-xs text-gray-500 mt-1">A tarefa será criada no dia {new Date(novaTarefa.data).getDate()} de cada mês</p>
+            </div>
+          )}
+        </div>}
       </div>
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowTarefaModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddTarefa} className={`flex-1 ${btnGrad}`}>{editingTarefa?'Salvar':'Adicionar'}</button></div>
     </div></div>}
@@ -1168,6 +1195,29 @@ function G4Investimoveis(){
     {showContratoModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingContrato?'Editar Contrato':'Novo Contrato'}</h2><button onClick={()=>setShowContratoModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3">
+        <div><label className={labelCls}>Imagem do Contrato</label>
+          <div className="flex items-center gap-4">
+            {novoContrato.imagemUrl?(
+              <img src={novoContrato.imagemUrl} className="w-20 h-20 object-cover rounded-xl border-2 border-gray-200"/>
+            ):(
+              <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center border-2 border-gray-200"><Icons.Home className="w-10 h-10 text-gray-400"/></div>
+            )}
+            <div className="flex flex-col gap-2">
+              <label className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 text-sm font-medium text-center">
+                Escolher Imagem
+                <input type="file" accept="image/*" className="hidden" onChange={(e)=>{
+                  const file=e.target.files[0];
+                  if(file){
+                    const reader=new FileReader();
+                    reader.onload=(ev)=>setNovoContrato({...novoContrato,imagemUrl:ev.target.result});
+                    reader.readAsDataURL(file);
+                  }
+                }}/>
+              </label>
+              {novoContrato.imagemUrl&&<button onClick={()=>setNovoContrato({...novoContrato,imagemUrl:''})} className="px-4 py-2 bg-red-100 text-red-600 rounded-lg text-sm font-medium hover:bg-red-200">Remover</button>}
+            </div>
+          </div>
+        </div>
         <div><label className={labelCls}>Cliente *</label><input type="text" value={novoContrato.cliente} onChange={e=>setNovoContrato({...novoContrato,cliente:e.target.value})} placeholder="Nome do cliente" className={inputCls}/></div>
         <div><label className={labelCls}>Código de Referência</label><input type="text" value={novoContrato.codigoRef||''} onChange={e=>setNovoContrato({...novoContrato,codigoRef:e.target.value})} placeholder="Ex: CON-001" className={inputCls}/></div>
         <div><label className={labelCls}>Imóvel</label><input type="text" value={novoContrato.imovel} onChange={e=>setNovoContrato({...novoContrato,imovel:e.target.value})} placeholder="Identificação do imóvel" className={inputCls}/></div>
