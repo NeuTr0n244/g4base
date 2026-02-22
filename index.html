@@ -814,7 +814,7 @@ function G4Investimoveis(){
             <Icons.Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"/>
             <input
               type="text"
-              placeholder="Buscar contrato por nome..."
+              placeholder="Buscar por nome, endereço ou código..."
               value={buscaContrato}
               onChange={(e)=>setBuscaContrato(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 focus:outline-none transition-colors"
@@ -829,7 +829,16 @@ function G4Investimoveis(){
               const prog=getChecklistProgress(c);
               if(!prog.isCompleto)return false; // Apenas completos (9/9)
               if(!buscaContrato)return true;
-              return c.cliente.toLowerCase().includes(buscaContrato.toLowerCase());
+              const busca=buscaContrato.toLowerCase();
+              const nome=(c.cliente||'').toLowerCase();
+              const endereco=(c.endereco||c.imovel||'').toLowerCase();
+              const codigo=(c.codigoRef||c.id?.toString()||'').toLowerCase();
+              return nome.includes(busca)||endereco.includes(busca)||codigo.includes(busca);
+            })
+            .sort((a,b)=>{
+              const diasA=diasRestantes(a.dataVencimento);
+              const diasB=diasRestantes(b.dataVencimento);
+              return diasA-diasB; // menor (negativo/vencido) primeiro
             })
             .map(c=>{
             const dr=diasRestantes(c.dataVencimento);const badge=getStatusBadge(c);
@@ -872,7 +881,13 @@ function G4Investimoveis(){
                         <div className="flex flex-wrap gap-4 text-xs mt-2 opacity-70">
                           <span>Início: {fmtData(c.dataInicio)}</span>
                           <span>Vencimento: {fmtData(c.dataVencimento)}</span>
-                          {c.status==='ativo'&&dr>0&&<span className="font-semibold">{dr} dias restantes</span>}
+                          {c.status==='ativo'&&(dr<0?(
+                            <span className="font-semibold text-red-600">Vencido há {Math.abs(dr)} dias</span>
+                          ):dr<=30?(
+                            <span className="font-semibold text-amber-600">{dr} dias restantes</span>
+                          ):(
+                            <span className="font-semibold text-green-600">{dr} dias restantes</span>
+                          ))}
                         </div>
                       </div>
                       <div className="flex gap-2 items-center flex-shrink-0">
