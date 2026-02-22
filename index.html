@@ -68,6 +68,7 @@ const Icons={
   Printer:()=><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>,
   Eye:()=><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
   MapPin:()=><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+  Camera:()=><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
   Tag:()=><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>,
   User:()=><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>,
 };
@@ -219,7 +220,7 @@ function G4Investimoveis(){
   const[contratos,setContratos]=useState([]);
   const[showContratoModal,setShowContratoModal]=useState(false);
   const[editingContrato,setEditingContrato]=useState(null);
-  const[novoContrato,setNovoContrato]=useState({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false]});
+  const[novoContrato,setNovoContrato]=useState({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[buscaContrato,setBuscaContrato]=useState('');
   const[showGerador,setShowGerador]=useState(false);
@@ -393,7 +394,18 @@ function G4Investimoveis(){
     if(!novoContrato.cliente)return;
     const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now(),checklist:[false,false,false,false,false,false,false,false,false]};
     await fsAdd('contratos',item);
-    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false]});
+    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+  };
+
+  const handleImageUpload=async(contrato,file)=>{
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async(e)=>{
+      const base64=e.target.result;
+      const updated={...contrato,imagemUrl:base64};
+      await fsAdd('contratos',updated);
+    };
+    reader.readAsDataURL(file);
   };
 
   const checklistItems=['Contrato assinado','Assinatura coletada','Placa colocada','Fotos do imóvel','Publicado no site','Descritivo feito','Mapa de localização','Código gerado','Pasta arquivada'];
@@ -496,6 +508,7 @@ function G4Investimoveis(){
             </div>
             {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
             {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
+            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',imovel:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
             {abaAtiva==='emAndamento'&&<button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Gerar Novo Contrato</button>}
           </div>
         </div>
@@ -808,29 +821,51 @@ function G4Investimoveis(){
             <div key={c.id} className={`rounded-xl border shadow-sm transition-all ${getStatusColor(c)}`}>
               {/* Header do Card */}
               <div className="p-5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold">{c.cliente}</h3>
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
-                      <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
-                      <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
-                        {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
-                      </span>
+                <div className="flex gap-4">
+                  {/* Imagem do Contrato */}
+                  <div className="flex-shrink-0 relative group">
+                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-gray-200">
+                      {c.imagemUrl?(
+                        <img src={c.imagemUrl} alt={c.cliente} className="w-full h-full object-cover"/>
+                      ):(
+                        <Icons.Home className="w-10 h-10 text-gray-400"/>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-4 text-sm opacity-80">
-                      <span className="flex items-center gap-1.5"><Icons.Building2/>{c.imovel}</span>
-                      <span className="flex items-center gap-1.5"><Icons.DollarSign/>{c.valor}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-4 text-xs mt-2 opacity-70">
-                      <span>Início: {fmtData(c.dataInicio)}</span>
-                      <span>Vencimento: {fmtData(c.dataVencimento)}</span>
-                      {c.status==='ativo'&&dr>0&&<span className="font-semibold">{dr} dias restantes</span>}
-                    </div>
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-xl">
+                      <Icons.Camera className="w-6 h-6 text-white"/>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e)=>{if(e.target.files[0])handleImageUpload(c,e.target.files[0]);}}/>
+                    </label>
                   </div>
-                  <div className="flex gap-2 items-center">
-                    <button onClick={(e)=>{e.stopPropagation();setEditingContrato(c);setNovoContrato(c);setShowContratoModal(true);}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors" title="Editar"><Icons.Edit2/></button>
-                    <button onClick={async(e)=>{e.stopPropagation();if(confirm('Excluir contrato?')){await fsDel('contratos',c._docId||String(c.id));}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
+
+                  {/* Conteúdo do Card */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold">{c.cliente}</h3>
+                          <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
+                          <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
+                          <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
+                            {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
+                          </span>
+                        </div>
+                        {c.codigoRef&&<div className="text-sm font-mono text-gray-600 mb-2">📋 {c.codigoRef}</div>}
+                        <div className="flex flex-wrap gap-4 text-sm opacity-80">
+                          <span className="flex items-center gap-1.5"><Icons.Building2/>{c.imovel}</span>
+                          <span className="flex items-center gap-1.5"><Icons.DollarSign/>{c.valor}</span>
+                        </div>
+                        {c.endereco&&<div className="flex items-center gap-1.5 text-sm opacity-80 mt-2"><Icons.MapPin className="w-4 h-4"/>{c.endereco}</div>}
+                        <div className="flex flex-wrap gap-4 text-xs mt-2 opacity-70">
+                          <span>Início: {fmtData(c.dataInicio)}</span>
+                          <span>Vencimento: {fmtData(c.dataVencimento)}</span>
+                          {c.status==='ativo'&&dr>0&&<span className="font-semibold">{dr} dias restantes</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 items-center flex-shrink-0">
+                        <button onClick={(e)=>{e.stopPropagation();setEditingContrato(c);setNovoContrato(c);setShowContratoModal(true);}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors" title="Editar"><Icons.Edit2/></button>
+                        <button onClick={async(e)=>{e.stopPropagation();if(confirm('Excluir contrato?')){await fsDel('contratos',c._docId||String(c.id));}}} className="p-2.5 bg-white/50 rounded-xl hover:bg-white transition-colors text-red-500" title="Excluir"><Icons.Trash2/></button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1134,7 +1169,9 @@ function G4Investimoveis(){
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingContrato?'Editar Contrato':'Novo Contrato'}</h2><button onClick={()=>setShowContratoModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3">
         <div><label className={labelCls}>Cliente *</label><input type="text" value={novoContrato.cliente} onChange={e=>setNovoContrato({...novoContrato,cliente:e.target.value})} placeholder="Nome do cliente" className={inputCls}/></div>
-        <div><label className={labelCls}>Imóvel</label><input type="text" value={novoContrato.imovel} onChange={e=>setNovoContrato({...novoContrato,imovel:e.target.value})} placeholder="Endereço do imóvel" className={inputCls}/></div>
+        <div><label className={labelCls}>Código de Referência</label><input type="text" value={novoContrato.codigoRef||''} onChange={e=>setNovoContrato({...novoContrato,codigoRef:e.target.value})} placeholder="Ex: CON-001" className={inputCls}/></div>
+        <div><label className={labelCls}>Imóvel</label><input type="text" value={novoContrato.imovel} onChange={e=>setNovoContrato({...novoContrato,imovel:e.target.value})} placeholder="Identificação do imóvel" className={inputCls}/></div>
+        <div><label className={labelCls}>Endereço</label><input type="text" value={novoContrato.endereco||''} onChange={e=>setNovoContrato({...novoContrato,endereco:e.target.value})} placeholder="Endereço completo do imóvel" className={inputCls}/></div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className={labelCls}>Tipo</label><select value={novoContrato.tipo} onChange={e=>setNovoContrato({...novoContrato,tipo:e.target.value})} className={inputCls}><option>Venda</option><option>Locação</option><option>Permuta</option></select></div>
           <div><label className={labelCls}>Valor</label><input type="text" value={novoContrato.valor} onChange={e=>setNovoContrato({...novoContrato,valor:e.target.value})} placeholder="R$ 000,00" className={inputCls}/></div>
