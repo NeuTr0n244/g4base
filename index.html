@@ -86,103 +86,97 @@ const TEMPLATE_URLS = {
   'plural-CASA': 'https://res.cloudinary.com/dixrpwemq/raw/upload/v1771844986/OS_CONTRATANTE_-_CASA_lywska.doc',
   'plural-TERRENO': 'https://res.cloudinary.com/dixrpwemq/raw/upload/v1771844982/OS_CONTRATANTE_-_TERRENO_hid4cx.doc'
 };
-  // Debug: mostrar valores recebidos
-  console.log('Gerando contrato:', {genero: d.genero, tipoImovel: d.tipoImovel});
 
-  // Selecionar o template correto baseado em genero + tipoImovel
-  let templateBase64;
-  if(d.genero==='feminino'&&d.tipoImovel==='CASA') templateBase64=TEMPLATE_FEM_CASA;
-  else if(d.genero==='feminino'&&d.tipoImovel==='TERRENO') templateBase64=TEMPLATE_FEM_TERRENO;
-  else if(d.genero==='masculino'&&d.tipoImovel==='CASA') templateBase64=TEMPLATE_MASC_CASA;
-  else if(d.genero==='masculino'&&d.tipoImovel==='TERRENO') templateBase64=TEMPLATE_MASC_TERRENO;
-  else if(d.genero==='plural'&&d.tipoImovel==='CASA') templateBase64=TEMPLATE_PLURAL_CASA;
-  else if(d.genero==='plural'&&d.tipoImovel==='TERRENO') templateBase64=TEMPLATE_PLURAL_TERRENO;
-  else{
-    alert('Erro: Selecione o tipo de imóvel (CASA ou TERRENO) e o tratamento (A/O/OS Contratante)');
+async function gerarDocxReal(d) {
+  if(!d.tipoImovel || !d.genero) {
+    alert('Selecione o tipo de imóvel e o tratamento!');
     return null;
   }
 
-  // Verificar se o template foi encontrado e não está vazio
-  if(!templateBase64 || templateBase64.length === 0){
-    console.error('Template não encontrado para:', d.genero, d.tipoImovel);
-    alert('Erro: Template não encontrado. Verifique se selecionou Tipo de Imóvel e Tratamento.');
+  const chave = `${d.genero}-${d.tipoImovel}`;
+  const url = TEMPLATE_URLS[chave];
+
+  if(!url) {
+    alert('Template não encontrado para: ' + chave);
     return null;
   }
 
-  try{
-    // Decodificar base64
-    const bin=atob(templateBase64);
-    const arr=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  try {
+    const response = await fetch(url);
+    if(!response.ok) throw new Error('Falha ao baixar template');
+    const arrayBuffer = await response.arrayBuffer();
 
-    // Carregar o documento com JSZip
-    const zip=await JSZip.loadAsync(arr);
-    let xml=await zip.file('word/document.xml').async('string');
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    let xml = await zip.file('word/document.xml').async('string');
 
     // Preparar dados para casal
-    const isCasal=d.genero==='plural';
-    const nome1=d.nome||'_____________';
-    const nome2=d.nome2||'_____________';
-    const cpf1=d.cpf||'___.___.___-__';
-    const cpf2=d.cpf2||'___.___.___-__';
-    const rg1=d.rg||'_____________';
-    const rg2=d.rg2||'_____________';
+    const isCasal = d.genero === 'plural';
+    const nome1 = d.nome || '_____________';
+    const nome2 = d.nome2 || '_____________';
+    const cpf1 = d.cpf || '___.___.___-__';
+    const cpf2 = d.cpf2 || '___.___.___-__';
+    const rg1 = d.rg || '_____________';
+    const rg2 = d.rg2 || '_____________';
 
     // Substituições nos placeholders do template
-    const subs=[
-      ['{NOME}',nome1.toUpperCase()],
-      ['{NOME1}',nome1.toUpperCase()],
-      ['{NOME2}',nome2.toUpperCase()],
-      ['{NACIONALIDADE}',d.nacionalidade||'brasileiro(a)'],
-      ['{NACIONALIDADE1}',d.nacionalidade||'brasileiro'],
-      ['{NACIONALIDADE2}',d.nacionalidade2||'brasileira'],
-      ['{PROFISSAO}',d.profissao||'_____________'],
-      ['{PROFISSAO1}',d.profissao||'_____________'],
-      ['{PROFISSAO2}',d.profissao2||'_____________'],
-      ['{RG}',rg1+'-'+(d.orgaoEmissor||'SSP')+'/'+(d.rgUF||'PR')],
-      ['{RG1}',rg1+'-'+(d.orgaoEmissor||'SSP')+'/'+(d.rgUF||'PR')],
-      ['{RG2}',rg2+'-'+(d.orgaoEmissor2||'SSP')+'/'+(d.rgUF2||'PR')],
-      ['{CPF}',cpf1],
-      ['{CPF1}',cpf1],
-      ['{CPF2}',cpf2],
-      ['{ENDERECO}',d.endereco||'_____________'],
-      ['{CIDADE}',d.cidade||'Mamborê/PR'],
-      ['{CEP}',d.cep||'87340-000'],
-      ['{EMAIL}',d.email||'declara não possuir'],
-      ['{TELEFONE}',d.telefone||'(__)_____-____'],
-      ['{DATA_TERRAS_N}',d.dataTerraN||'___'],
-      ['{DATA_TERRAS_EXTENSO}',d.dataTerraNExtenso||'_____________'],
-      ['{QUADRA_N}',d.quadraN||'___'],
-      ['{QUADRA_EXTENSO}',d.quadraNExtenso||'_____________'],
-      ['{AREA_M2}',d.areaM2||'_____'],
-      ['{ENDERECO_IMOVEL}',d.enderecoImovel||'_____________'],
-      ['{CIDADE_IMOVEL}',d.cidadeImovel||'Mamborê/PR'],
-      ['{MATRICULA}',d.matricula||'___'],
-      ['{LIVRO}',d.livro||'___'],
-      ['{VALOR_VENDA}',d.valorVenda||'_____________'],
-      ['{VALOR_EXTENSO}',d.valorVendaExtenso||'_____________'],
-      ['{VIGENCIA_MESES}',d.vigenciaMeses||'12'],
-      ['{VIGENCIA_EXTENSO}',d.vigenciaMesesExtenso||'doze'],
-      ['{COMISSAO_PERCENT}',d.comissaoPercent||'5'],
-      ['{COMISSAO_EXTENSO}',d.comissaoPercentExtenso||'cinco por cento'],
-      ['{DATA_CONTRATO}',d.dataContrato||'______ de __________________ de ________'],
-      ['{TESTEMUNHA_NOME}',d.testemunhaNome||'_________________________'],
-      ['{TESTEMUNHA_CPF}',d.testemunhaCPF||'___.___.___-__'],
+    const subs = [
+      ['{NOME}', nome1.toUpperCase()],
+      ['{NOME1}', nome1.toUpperCase()],
+      ['{NOME2}', nome2.toUpperCase()],
+      ['{NACIONALIDADE}', d.nacionalidade || 'brasileiro(a)'],
+      ['{NACIONALIDADE1}', d.nacionalidade || 'brasileiro'],
+      ['{NACIONALIDADE2}', d.nacionalidade2 || 'brasileira'],
+      ['{PROFISSAO}', d.profissao || '_____________'],
+      ['{PROFISSAO1}', d.profissao || '_____________'],
+      ['{PROFISSAO2}', d.profissao2 || '_____________'],
+      ['{RG}', rg1 + '-' + (d.orgaoEmissor || 'SSP') + '/' + (d.rgUF || 'PR')],
+      ['{RG1}', rg1 + '-' + (d.orgaoEmissor || 'SSP') + '/' + (d.rgUF || 'PR')],
+      ['{RG2}', rg2 + '-' + (d.orgaoEmissor2 || 'SSP') + '/' + (d.rgUF2 || 'PR')],
+      ['{CPF}', cpf1],
+      ['{CPF1}', cpf1],
+      ['{CPF2}', cpf2],
+      ['{ENDERECO}', d.endereco || '_____________'],
+      ['{CIDADE}', d.cidade || 'Mamborê/PR'],
+      ['{CEP}', d.cep || '87340-000'],
+      ['{EMAIL}', d.email || 'declara não possuir'],
+      ['{TELEFONE}', d.telefone || '(__)_____-____'],
+      ['{DATA_TERRAS_N}', d.dataTerraN || '___'],
+      ['{DATA_TERRAS_EXTENSO}', d.dataTerraNExtenso || '_____________'],
+      ['{QUADRA_N}', d.quadraN || '___'],
+      ['{QUADRA_EXTENSO}', d.quadraNExtenso || '_____________'],
+      ['{AREA_M2}', d.areaM2 || '_____'],
+      ['{ENDERECO_IMOVEL}', d.enderecoImovel || '_____________'],
+      ['{CIDADE_IMOVEL}', d.cidadeImovel || 'Mamborê/PR'],
+      ['{MATRICULA}', d.matricula || '___'],
+      ['{LIVRO}', d.livro || '___'],
+      ['{VALOR_VENDA}', d.valorVenda || '_____________'],
+      ['{VALOR_EXTENSO}', d.valorVendaExtenso || '_____________'],
+      ['{VIGENCIA_MESES}', d.vigenciaMeses || '12'],
+      ['{VIGENCIA_EXTENSO}', d.vigenciaMesesExtenso || 'doze'],
+      ['{COMISSAO_PERCENT}', d.comissaoPercent || '5'],
+      ['{COMISSAO_EXTENSO}', d.comissaoPercentExtenso || 'cinco por cento'],
+      ['{DATA_CONTRATO}', d.dataContrato || '______ de __________________ de ________'],
+      ['{TESTEMUNHA_NOME}', d.testemunhaNome || '_________________________'],
+      ['{TESTEMUNHA_CPF}', d.testemunhaCPF || '___.___.___-__'],
     ];
 
     // Aplicar substituições
-    for(const[placeholder,valor]of subs){
-      xml=xml.split(placeholder).join(valor);
+    for(const [placeholder, valor] of subs) {
+      xml = xml.split(placeholder).join(valor);
     }
 
     // Salvar XML modificado
-    zip.file('word/document.xml',xml);
+    zip.file('word/document.xml', xml);
 
     // Gerar blob final
-    return await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-  }catch(erro){
-    console.error('Erro ao gerar documento:',erro);
-    alert('Erro ao processar o template. Verifique os dados e tente novamente.');
+    return await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+
+  } catch(error) {
+    console.error('Erro ao gerar documento:', error);
+    alert('Erro ao gerar contrato: ' + error.message);
     return null;
   }
 }
