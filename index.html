@@ -570,7 +570,16 @@ function G4Investimoveis(){
             {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
             {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
             {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
-            {abaAtiva==='emAndamento'&&<button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Gerar Novo Contrato</button>}
+            {abaAtiva==='emAndamento'&&(
+              <div className="flex gap-2">
+                <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
+                  <Icons.Plus/>Adicionar Contrato
+                </button>
+                <button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}>
+                  <Icons.Plus/>Gerar Novo Contrato
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
