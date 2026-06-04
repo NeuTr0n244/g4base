@@ -229,6 +229,10 @@ function G4Investimoveis(){
   const fsWipe=async(col)=>{try{const snap=await db.collection(col).get();if(snap.empty)return;const b=db.batch();snap.docs.forEach(d=>b.delete(d.ref));await b.commit();}catch(e){console.error(e);}};
   const fsBulk=async(col,items)=>{try{const b=db.batch();items.forEach(i=>{b.set(db.collection(col).doc(String(i.id)),cleanForFS(i));});await b.commit();return true;}catch(e){console.error(e);return false;}};
 
+  // === MASCARAS DE INPUT (data DD/MM/AAAA e valor R$ 0.000,00) ===
+  const mascaraData=(v)=>{const d=(v||'').replace(/\D/g,'').slice(0,8);if(d.length<=2)return d;if(d.length<=4)return d.slice(0,2)+'/'+d.slice(2);return d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4);};
+  const mascaraValor=(v)=>{let n=(v||'').replace(/\D/g,'').replace(/^0+/,'');if(!n)return '';while(n.length<3)n='0'+n;const c=n.slice(-2);const i=n.slice(0,-2).replace(/\B(?=(\d{3})+(?!\d))/g,'.');return 'R$ '+i+','+c;};
+
   const[loading,setLoading]=useState(true);
   const[syncStatus,setSyncStatus]=useState('');
   const loadedRef=React.useRef(false);
@@ -1238,10 +1242,10 @@ function G4Investimoveis(){
     {showModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingCliente?'Editar Cliente':'Novo Cliente'}</h2><button onClick={()=>setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:e.target.value})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:e.target.value})} className={inputCls}/></div></div>
+        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:mascaraData(e.target.value)})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:e.target.value})} className={inputCls}/></div></div>
         <div><label className={labelCls}>Nome</label><input type="text" placeholder="Nome completo" value={novoCliente.nome} onChange={e=>setNovoCliente({...novoCliente,nome:e.target.value})} className={inputCls}/></div>
         <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Interesse</label><select value={novoCliente.interesse} onChange={e=>setNovoCliente({...novoCliente,interesse:e.target.value})} className={inputCls}><option value="">Selecione</option>{interesses.map(i=><option key={i}>{i}</option>)}</select></div><div><label className={labelCls}>Tipo</label><select value={novoCliente.tipo} onChange={e=>setNovoCliente({...novoCliente,tipo:e.target.value})} className={inputCls}><option value="">Selecione</option>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
-        <div><label className={labelCls}>Valor</label><input type="text" placeholder="Ex: R$ 250.000" value={novoCliente.valor} onChange={e=>setNovoCliente({...novoCliente,valor:e.target.value})} className={inputCls}/></div>
+        <div><label className={labelCls}>Valor</label><input type="text" inputMode="numeric" placeholder="Ex: R$ 250.000,00" value={novoCliente.valor} onChange={e=>setNovoCliente({...novoCliente,valor:mascaraValor(e.target.value)})} className={inputCls}/></div>
         <div><label className={labelCls}>Descrição</label><textarea placeholder="Detalhes..." value={novoCliente.descricao} onChange={e=>setNovoCliente({...novoCliente,descricao:e.target.value})} rows={2} className={inputCls+" resize-none"}/></div>
       </div>
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddCliente} className={`flex-1 ${btnGrad}`}>{editingCliente?'Salvar':'Adicionar'}</button></div>
