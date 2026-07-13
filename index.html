@@ -261,6 +261,8 @@ function G4Investimoveis(){
   const[editingTarefa,setEditingTarefa]=useState(null);
   const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:''});
   const[diaSelecionado,setDiaSelecionado]=useState(null);
+  const[visaoCalendario,setVisaoCalendario]=useState('grade');
+  const[semanaOffset,setSemanaOffset]=useState(0);
   const[showNotificacoes,setShowNotificacoes]=useState(false);
   const[notifsVistas,setNotifsVistas]=useState(0);
 
@@ -416,6 +418,34 @@ function G4Investimoveis(){
   const hojeStr=`${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
   const getDiasDoMes=(m,a)=>{const p=new Date(a,m,1);const ds=p.getDay();const td=new Date(a,m+1,0).getDate();const d=[];for(let i=0;i<ds;i++)d.push(null);for(let i=1;i<=td;i++)d.push(i);return d;};
   const getTarefasDoDia=(dia)=>{if(!dia)return[];const ds=`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;return tarefas.filter(t=>t.data===ds);};
+  const dsFromDate=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const getDiasDaSemana=(offset)=>{const base=new Date(hoje);base.setDate(base.getDate()+offset*7);const dow=base.getDay();const dom=new Date(base);dom.setDate(base.getDate()-dow);return Array.from({length:7},(_,i)=>{const d=new Date(dom);d.setDate(dom.getDate()+i);return d;});};
+  const diasComTarefasNoMes=useMemo(()=>{const total=new Date(anoAtual,mesAtual+1,0).getDate();const arr=[];for(let d=1;d<=total;d++){const ds=`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;if(tarefas.some(t=>t.data===ds))arr.push({dia:d,ds});}return arr;},[tarefas,mesAtual,anoAtual]);
+  const renderTarefasCard=(ds,label)=>{
+    const tD=tarefas.filter(t=>t.data===ds).sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+    const isH=ds===hojeStr;
+    return(<div key={ds} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200 ${isH?'bg-orange-50':'bg-gray-50'}`}>
+        <h4 className={`font-semibold text-sm ${isH?'text-orange-700':'text-gray-700'}`}>{label}{isH&&<span className="ml-2 text-[10px] font-bold text-orange-500 align-middle">HOJE</span>}</h4>
+        <button onClick={()=>abrirNovaTarefa(parseInt(ds.split('-')[2]))} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Icons.Plus/></button>
+      </div>
+      <div className="p-3 space-y-2">
+        {tD.length>0?tD.map(t=>(<div key={t.id} className={`p-3 rounded-lg border ${t.concluida?'bg-gray-50 border-gray-200':t.data<hojeStr?'bg-red-50 border-red-200':'bg-white border-gray-200'}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <button onClick={()=>toggleConcluida(t.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${t.concluida?'bg-green-500 border-green-500 text-white':'border-gray-300 hover:border-green-500'}`}>{t.concluida&&<Icons.Check/>}</button>
+                <span className={`font-medium text-sm break-words ${t.concluida?'line-through text-gray-400':'text-gray-800'}`}>{t.titulo}</span>
+              </div>
+              {t.descricao&&<p className="text-xs text-gray-500 mt-1 ml-7 break-words">{t.descricao}</p>}
+              <div className="flex items-center gap-2 mt-1.5 ml-7">{t.hora&&<span className="text-xs text-gray-400 flex items-center gap-1"><Icons.Clock/>{t.hora}</span>}<span className={`text-xs px-2 py-0.5 rounded-full text-white ${getPC(t.prioridade)}`}>{getPL(t.prioridade)}</span></div>
+            </div>
+            <div className="flex gap-1 flex-shrink-0"><button onClick={()=>editarTarefa(t)} className="p-1 text-gray-400 hover:text-blue-500"><Icons.Edit2/></button><button onClick={()=>deletarTarefa(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Icons.Trash2/></button></div>
+          </div>
+        </div>)):<p className="text-gray-400 text-sm text-center py-3">Nenhuma tarefa</p>}
+      </div>
+    </div>);
+  };
   const tarefasAtrasadas=useMemo(()=>tarefas.filter(t=>!t.concluida&&t.data<hojeStr),[tarefas,hojeStr]);
   const tarefasHoje=useMemo(()=>tarefas.filter(t=>!t.concluida&&t.data===hojeStr),[tarefas,hojeStr]);
   const tarefasPendentes=useMemo(()=>tarefas.filter(t=>!t.concluida).length,[tarefas]);
@@ -609,24 +639,51 @@ function G4Investimoveis(){
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between p-5 bg-gray-800">
-                <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
-                <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
-                <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
+                {visaoCalendario!=='semana'?(<>
+                  <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
+                  <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
+                  <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
+                </>):(
+                  <h2 className="text-xl md:text-2xl font-bold text-white mx-auto">Agenda Semanal</h2>
+                )}
               </div>
-              <div className="sm:hidden text-center text-xs text-gray-400 py-1 bg-gray-50 border-b border-gray-200">← arraste para o lado para ver a semana completa →</div>
-              <div className="overflow-x-auto">
-                <div className="min-w-[700px] sm:min-w-0">
-                  <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-4 text-center text-sm md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
-                  <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
-                    const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
-                    const isH=ds===hojeStr;const isS=diaSelecionado===ds;
-                    return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[120px] md:min-h-[140px] p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
-                      {dia&&<><div className="flex items-center justify-between"><span className={`text-base md:text-lg font-semibold w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
-                      <div className="mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-1 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div></>}
-                    </div>);
-                  })}</div>
+              <div className="flex items-center gap-1 px-3 py-2 bg-gray-800 border-t border-gray-700">
+                {[{k:'grade',l:'Grade'},{k:'lista',l:'Lista'},{k:'semana',l:'Semana'}].map(v=>(
+                  <button key={v.k} onClick={()=>{setVisaoCalendario(v.k);if(v.k==='semana')setSemanaOffset(0);}} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${visaoCalendario===v.k?'bg-orange-500 text-white':'text-gray-300 hover:bg-gray-700'}`}>{v.l}</button>
+                ))}
+              </div>
+
+              {visaoCalendario==='grade'&&(<>
+                <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-2 md:py-4 text-center text-xs md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
+                <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
+                  const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
+                  const isH=ds===hojeStr;const isS=diaSelecionado===ds;
+                  return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[56px] md:min-h-[140px] p-1 md:p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
+                    {dia&&<>
+                      <div className="flex items-center justify-center md:justify-between"><span className={`text-xs md:text-lg font-semibold w-6 h-6 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
+                      {tD.length>0&&<div className="md:hidden flex flex-wrap justify-center gap-0.5 mt-1">{tD.slice(0,5).map(t=><span key={t.id} className={`w-1.5 h-1.5 rounded-full ${t.concluida?'bg-gray-300':t.data<hojeStr?'bg-red-500':getPC(t.prioridade)}`}></span>)}{tD.length>5&&<span className="text-[9px] text-gray-400 leading-none">+{tD.length-5}</span>}</div>}
+                      <div className="hidden md:block mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-1 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div>
+                    </>}
+                  </div>);
+                })}</div>
+              </>)}
+
+              {visaoCalendario==='lista'&&(
+                <div className="p-3 sm:p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                  {diasComTarefasNoMes.length>0?diasComTarefasNoMes.map(({dia,ds})=>renderTarefasCard(ds,`${DIAS_SEMANA[new Date(anoAtual,mesAtual,dia).getDay()]} ${String(dia).padStart(2,'0')}/${String(mesAtual+1).padStart(2,'0')}`)):<p className="text-gray-400 text-sm text-center py-10">Nenhuma tarefa em {MESES[mesAtual]}</p>}
                 </div>
-              </div>
+              )}
+
+              {visaoCalendario==='semana'&&(<>
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  <button onClick={()=>setSemanaOffset(semanaOffset-1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-lg"><Icons.ChevronLeft/></button>
+                  <button onClick={()=>setSemanaOffset(0)} className="text-xs font-semibold text-gray-500 hover:text-gray-800">{semanaOffset===0?'Semana atual':'Voltar para hoje'}</button>
+                  <button onClick={()=>setSemanaOffset(semanaOffset+1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-lg"><Icons.ChevronRight/></button>
+                </div>
+                <div className="p-3 sm:p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                  {getDiasDaSemana(semanaOffset).map(d=>renderTarefasCard(dsFromDate(d),`${DIAS_SEMANA[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`))}
+                </div>
+              </>)}
             </div>
           </div>
           <div className="space-y-4">
