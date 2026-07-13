@@ -531,15 +531,15 @@ function G4Investimoveis(){
     {/* HEADER */}
     <header className="bg-gray-800 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src={LOGO_SRC} alt="G4" className="h-14 w-auto rounded"/>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <img src={LOGO_SRC} alt="G4" className="h-10 sm:h-14 w-auto rounded"/>
             <div>
-              <h1 className="text-2xl font-bold"><span className="text-red-500">G4</span> <span className="text-orange-400">INVESTIMÓVEIS</span></h1>
-              <p className="text-gray-400 text-sm">Sistema de Gestão</p>
+              <h1 className="text-lg sm:text-2xl font-bold"><span className="text-red-500">G4</span> <span className="text-orange-400">INVESTIMÓVEIS</span></h1>
+              <p className="text-gray-400 text-xs sm:text-sm">Sistema de Gestão</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center flex-wrap gap-2 sm:gap-3">
             <div className="relative">
               <button onClick={async()=>{
                 if(!showNotificacoes){
@@ -552,7 +552,7 @@ function G4Investimoveis(){
                 {totalNotifs>0&&totalNotifs!==notifsVistas&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
               </button>
               {showNotificacoes&&(
-                <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
+                <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] max-w-sm sm:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
                   <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Notificações</h3></div>
                   <div className="max-h-80 overflow-y-auto">
                     {contratosVencidos.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
@@ -589,10 +589,10 @@ function G4Investimoveis(){
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex gap-0">
+        <div className="flex gap-0 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
           {[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0}].map(t=>(
             <button key={t.k} onClick={()=>setAbaAtiva(t.k)}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
+              className={`flex items-center gap-2 shrink-0 px-3 sm:px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
               <t.I/>{t.l}
               {t.b>0&&<span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">{t.b}</span>}
             </button>
@@ -1017,12 +1017,12 @@ function G4Investimoveis(){
                     </h4>
                     <div className="space-y-3">
                       <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome} onChange={e=>setDadosContrato({...dadosContrato,nome:e.target.value})} placeholder="Ex: João da Silva" className={inputCls}/></div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade:e.target.value})} placeholder="brasileiro" className={inputCls}/></div>
                         <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: engenheiro" className={inputCls}/></div>
                       </div>
                       <div className="text-xs text-gray-500 italic">Estado Civil: casado | Gênero: portador</div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg} onChange={e=>setDadosContrato({...dadosContrato,rg:e.target.value})} placeholder="Ex: 12.345.678-9" className={inputCls}/></div>
                         <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpf} onChange={e=>setDadosContrato({...dadosContrato,cpf:e.target.value})} placeholder="Ex: 123.456.789-00" className={inputCls}/></div>
                       </div>
@@ -1037,12 +1037,12 @@ function G4Investimoveis(){
                     </h4>
                     <div className="space-y-3">
                       <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome2} onChange={e=>setDadosContrato({...dadosContrato,nome2:e.target.value})} placeholder="Ex: Maria da Silva" className={inputCls}/></div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade2} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade2:e.target.value})} placeholder="brasileira" className={inputCls}/></div>
                         <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao2} onChange={e=>setDadosContrato({...dadosContrato,profissao2:e.target.value})} placeholder="Ex: professora" className={inputCls}/></div>
                       </div>
                       <div className="text-xs text-gray-500 italic">Estado Civil: casada | Gênero: portadora</div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg2} onChange={e=>setDadosContrato({...dadosContrato,rg2:e.target.value})} placeholder="Ex: 98.765.432-1" className={inputCls}/></div>
                         <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpf2} onChange={e=>setDadosContrato({...dadosContrato,cpf2:e.target.value})} placeholder="Ex: 987.654.321-00" className={inputCls}/></div>
                       </div>
@@ -1057,11 +1057,11 @@ function G4Investimoveis(){
                     </h4>
                     <div className="space-y-3">
                       <div><label className={labelCls}>Endereço Completo</label><input type="text" value={dadosContrato.endereco} onChange={e=>setDadosContrato({...dadosContrato,endereco:e.target.value})} placeholder="Ex: Rua Piraí, nº 60, centro" className={inputCls}/></div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Cidade/UF</label><input type="text" value={dadosContrato.cidade} onChange={e=>setDadosContrato({...dadosContrato,cidade:e.target.value})} placeholder="Ex: Mamborê/PR" className={inputCls}/></div>
                         <div><label className={labelCls}>CEP</label><input type="text" value={dadosContrato.cep} onChange={e=>setDadosContrato({...dadosContrato,cep:e.target.value})} placeholder="87340-000" className={inputCls}/></div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Telefone</label><input type="text" value={dadosContrato.telefone} onChange={e=>setDadosContrato({...dadosContrato,telefone:e.target.value})} placeholder="(44) 99999-9999" className={inputCls}/></div>
                         <div><label className={labelCls}>E-mail</label><input type="text" value={dadosContrato.email} onChange={e=>setDadosContrato({...dadosContrato,email:e.target.value})} placeholder="email@exemplo.com" className={inputCls}/></div>
                       </div>
@@ -1074,11 +1074,11 @@ function G4Investimoveis(){
               {dadosContrato.genero!=='plural'&&(
                 <>
               <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome} onChange={e=>setDadosContrato({...dadosContrato,nome:e.target.value})} placeholder="Ex: Maria Domingues dos Santos" className={inputCls}/></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade:e.target.value})} className={inputCls}/></div>
                 <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: aposentada" className={inputCls}/></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><label className={labelCls}>Portador(a)</label><select value={dadosContrato.portadorGenero} onChange={e=>setDadosContrato({...dadosContrato,portadorGenero:e.target.value})} className={inputCls}>
                   <option value="portador">portador</option><option value="portadora">portadora</option>
                 </select></div>
@@ -1087,7 +1087,7 @@ function G4Investimoveis(){
                   {['SSP','SESP','IFP','PC','DETRAN','PM','CBM','CREA','CRM','OAB','Outro'].map(o=><option key={o} value={o}>{o}</option>)}
                 </select></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>UF do RG</label><select value={dadosContrato.rgUF} onChange={e=>setDadosContrato({...dadosContrato,rgUF:e.target.value})} className={inputCls}>
                   {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map(u=><option key={u} value={u}>{u}</option>)}
                 </select></div>
@@ -1105,11 +1105,11 @@ function G4Investimoveis(){
                   </select></div>
                   <div><label className={labelCls}>Data do Casamento</label><input type="text" value={dadosContrato.dataCasamento} onChange={e=>setDadosContrato({...dadosContrato,dataCasamento:e.target.value})} placeholder="Ex: 15/01/2015" className={inputCls}/></div>
                   <div><label className={labelCls}>Nome Completo do Cônjuge</label><input type="text" value={dadosContrato.nomeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nomeConjuge:e.target.value})} placeholder="Ex: Lucas de Souza Vieira" className={inputCls}/></div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidadeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nacionalidadeConjuge:e.target.value})} className={inputCls}/></div>
                     <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissaoConjuge} onChange={e=>setDadosContrato({...dadosContrato,profissaoConjuge:e.target.value})} placeholder="Ex: Autonomo" className={inputCls}/></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div><label className={labelCls}>Portador(a)</label><select value={dadosContrato.portadorGeneroConjuge} onChange={e=>setDadosContrato({...dadosContrato,portadorGeneroConjuge:e.target.value})} className={inputCls}>
                       <option value="portador">portador</option><option value="portadora">portadora</option>
                     </select></div>
@@ -1118,7 +1118,7 @@ function G4Investimoveis(){
                       {['SSP','SESP','IFP','PC','DETRAN','PM','CBM','CREA','CRM','OAB','Outro'].map(o=><option key={o} value={o}>{o}</option>)}
                     </select></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label className={labelCls}>UF do RG</label><select value={dadosContrato.rgUFConjuge} onChange={e=>setDadosContrato({...dadosContrato,rgUFConjuge:e.target.value})} className={inputCls}>
                       {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map(u=><option key={u} value={u}>{u}</option>)}
                     </select></div>
@@ -1127,11 +1127,11 @@ function G4Investimoveis(){
                 </div>
               )}
               <div><label className={labelCls}>Endereço</label><input type="text" value={dadosContrato.endereco} onChange={e=>setDadosContrato({...dadosContrato,endereco:e.target.value})} placeholder="Rua, nº, bairro" className={inputCls}/></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>Cidade/UF</label><input type="text" value={dadosContrato.cidade} onChange={e=>setDadosContrato({...dadosContrato,cidade:e.target.value})} className={inputCls}/></div>
                 <div><label className={labelCls}>CEP</label><input type="text" value={dadosContrato.cep} onChange={e=>setDadosContrato({...dadosContrato,cep:e.target.value})} className={inputCls}/></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>Telefone</label><input type="text" value={dadosContrato.telefone} onChange={e=>setDadosContrato({...dadosContrato,telefone:e.target.value})} placeholder="(44) 99999-9999" className={inputCls}/></div>
                 <div><label className={labelCls}>E-mail</label><input type="text" value={dadosContrato.email} onChange={e=>setDadosContrato({...dadosContrato,email:e.target.value})} placeholder="ou: declara não possuir" className={inputCls}/></div>
               </div>
@@ -1145,18 +1145,18 @@ function G4Investimoveis(){
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Icons.Building2/>Dados do Imóvel</h3>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Data de Terras nº</label><input type="text" value={dadosContrato.dataTerraN} onChange={e=>setDadosContrato({...dadosContrato,dataTerraN:e.target.value})} placeholder="Ex: 08" className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.dataTerraNExtenso} onChange={e=>setDadosContrato({...dadosContrato,dataTerraNExtenso:e.target.value})} placeholder="Ex: oito" className={inputCls}/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Quadra nº</label><input type="text" value={dadosContrato.quadraN} onChange={e=>setDadosContrato({...dadosContrato,quadraN:e.target.value})} placeholder="Ex: 111" className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.quadraNExtenso} onChange={e=>setDadosContrato({...dadosContrato,quadraNExtenso:e.target.value})} placeholder="Ex: cento e onze" className={inputCls}/></div>
                 </div>
                 <div><label className={labelCls}>Área (m²)</label><input type="text" value={dadosContrato.areaM2} onChange={e=>setDadosContrato({...dadosContrato,areaM2:e.target.value})} placeholder="Ex: 750,00" className={inputCls}/></div>
                 <div><label className={labelCls}>Endereço do Imóvel</label><input type="text" value={dadosContrato.enderecoImovel} onChange={e=>setDadosContrato({...dadosContrato,enderecoImovel:e.target.value})} placeholder="Av. Archiles Martins, nº 608" className={inputCls}/></div>
                 <div><label className={labelCls}>Cidade/UF do Imóvel</label><input type="text" value={dadosContrato.cidadeImovel} onChange={e=>setDadosContrato({...dadosContrato,cidadeImovel:e.target.value})} className={inputCls}/></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Matrícula nº</label><input type="text" value={dadosContrato.matricula} onChange={e=>setDadosContrato({...dadosContrato,matricula:e.target.value})} className={inputCls}/></div>
                   <div><label className={labelCls}>Livro nº</label><input type="text" value={dadosContrato.livro} onChange={e=>setDadosContrato({...dadosContrato,livro:e.target.value})} className={inputCls}/></div>
                 </div>
@@ -1165,21 +1165,21 @@ function G4Investimoveis(){
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Icons.DollarSign/>Condições</h3>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Valor (R$)</label><input type="text" value={dadosContrato.valorVenda} onChange={e=>setDadosContrato({...dadosContrato,valorVenda:e.target.value})} placeholder="165.000,00" className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.valorVendaExtenso} onChange={e=>setDadosContrato({...dadosContrato,valorVendaExtenso:e.target.value})} placeholder="cento e sessenta e cinco mil reais" className={inputCls}/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Vigência (meses)</label><input type="text" value={dadosContrato.vigenciaMeses} onChange={e=>setDadosContrato({...dadosContrato,vigenciaMeses:e.target.value})} className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.vigenciaMesesExtenso} onChange={e=>setDadosContrato({...dadosContrato,vigenciaMesesExtenso:e.target.value})} className={inputCls}/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Comissão (%)</label><input type="text" value={dadosContrato.comissaoPercent} onChange={e=>setDadosContrato({...dadosContrato,comissaoPercent:e.target.value})} className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.comissaoPercentExtenso} onChange={e=>setDadosContrato({...dadosContrato,comissaoPercentExtenso:e.target.value})} className={inputCls}/></div>
                 </div>
                 <h4 className="font-semibold text-gray-700 mt-4 pt-3 border-t border-gray-200">Testemunha e Data</h4>
                 <div><label className={labelCls}>Data do Contrato</label><input type="text" value={dadosContrato.dataContrato} onChange={e=>setDadosContrato({...dadosContrato,dataContrato:e.target.value})} placeholder="Ex: 15 de janeiro de 2026" className={inputCls}/></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Nome Testemunha</label><input type="text" value={dadosContrato.testemunhaNome} onChange={e=>setDadosContrato({...dadosContrato,testemunhaNome:e.target.value})} placeholder="Nome da testemunha" className={inputCls}/></div>
                   <div><label className={labelCls}>CPF Testemunha</label><input type="text" value={dadosContrato.testemunhaCPF} onChange={e=>setDadosContrato({...dadosContrato,testemunhaCPF:e.target.value})} placeholder="000.000.000-00" className={inputCls}/></div>
                 </div>
@@ -1243,9 +1243,9 @@ function G4Investimoveis(){
     {showModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingCliente?'Editar Cliente':'Novo Cliente'}</h2><button onClick={()=>setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:mascaraData(e.target.value)})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" inputMode="numeric" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:mascaraTelefone(e.target.value)})} className={inputCls}/></div></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:mascaraData(e.target.value)})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" inputMode="numeric" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:mascaraTelefone(e.target.value)})} className={inputCls}/></div></div>
         <div><label className={labelCls}>Nome</label><input type="text" placeholder="Nome completo" value={novoCliente.nome} onChange={e=>setNovoCliente({...novoCliente,nome:e.target.value})} className={inputCls}/></div>
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Interesse</label><select value={novoCliente.interesse} onChange={e=>setNovoCliente({...novoCliente,interesse:e.target.value})} className={inputCls}><option value="">Selecione</option>{interesses.map(i=><option key={i}>{i}</option>)}</select></div><div><label className={labelCls}>Tipo</label><select value={novoCliente.tipo} onChange={e=>setNovoCliente({...novoCliente,tipo:e.target.value})} className={inputCls}><option value="">Selecione</option>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Interesse</label><select value={novoCliente.interesse} onChange={e=>setNovoCliente({...novoCliente,interesse:e.target.value})} className={inputCls}><option value="">Selecione</option>{interesses.map(i=><option key={i}>{i}</option>)}</select></div><div><label className={labelCls}>Tipo</label><select value={novoCliente.tipo} onChange={e=>setNovoCliente({...novoCliente,tipo:e.target.value})} className={inputCls}><option value="">Selecione</option>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
         <div><label className={labelCls}>Valor</label><input type="text" inputMode="numeric" placeholder="Ex: R$ 250.000,00" value={novoCliente.valor} onChange={e=>setNovoCliente({...novoCliente,valor:mascaraValor(e.target.value)})} className={inputCls}/></div>
         <div><label className={labelCls}>Descrição</label><textarea placeholder="Detalhes..." value={novoCliente.descricao} onChange={e=>setNovoCliente({...novoCliente,descricao:e.target.value})} rows={2} className={inputCls+" resize-none"}/></div>
       </div>
@@ -1256,7 +1256,7 @@ function G4Investimoveis(){
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingTarefa?'Editar Tarefa':'Nova Tarefa'}</h2><button onClick={()=>setShowTarefaModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3">
         <div><label className={labelCls}>Título *</label><input type="text" value={novaTarefa.titulo} onChange={e=>setNovaTarefa({...novaTarefa,titulo:e.target.value})} placeholder="Ex: Visitar imóvel..." className={inputCls}/></div>
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data *</label><input type="date" value={novaTarefa.data} onChange={e=>setNovaTarefa({...novaTarefa,data:e.target.value})} className={inputCls}/></div><div><label className={labelCls}>Horário</label><input type="time" value={novaTarefa.hora} onChange={e=>setNovaTarefa({...novaTarefa,hora:e.target.value})} className={inputCls}/></div></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Data *</label><input type="date" value={novaTarefa.data} onChange={e=>setNovaTarefa({...novaTarefa,data:e.target.value})} className={inputCls}/></div><div><label className={labelCls}>Horário</label><input type="time" value={novaTarefa.hora} onChange={e=>setNovaTarefa({...novaTarefa,hora:e.target.value})} className={inputCls}/></div></div>
         <div><label className={labelCls}>Prioridade</label><div className="flex gap-3">{[{v:'baixa',l:'Baixa',c:'border-green-500 bg-green-50 text-green-700'},{v:'media',l:'Média',c:'border-amber-500 bg-amber-50 text-amber-700'},{v:'alta',l:'Alta',c:'border-red-500 bg-red-50 text-red-700'}].map(p=><button key={p.v} onClick={()=>setNovaTarefa({...novaTarefa,prioridade:p.v})} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${novaTarefa.prioridade===p.v?p.c:'border-gray-200 bg-gray-50 text-gray-500'}`}>{p.l}</button>)}</div></div>
         <div><label className={labelCls}>Descrição</label><textarea value={novaTarefa.descricao} onChange={e=>setNovaTarefa({...novaTarefa,descricao:e.target.value})} rows={2} className={inputCls+" resize-none"} placeholder="Detalhes..."/></div>
         {!editingTarefa&&<div className="border-t border-gray-200 pt-3">
@@ -1305,11 +1305,11 @@ function G4Investimoveis(){
         <div><label className={labelCls}>Cliente *</label><input type="text" value={novoContrato.cliente} onChange={e=>setNovoContrato({...novoContrato,cliente:e.target.value})} placeholder="Nome do cliente" className={inputCls}/></div>
         <div><label className={labelCls}>Código de Referência</label><input type="text" value={novoContrato.codigoRef||''} onChange={e=>setNovoContrato({...novoContrato,codigoRef:e.target.value})} placeholder="Ex: CON-001" className={inputCls}/></div>
         <div><label className={labelCls}>Endereço</label><input type="text" value={novoContrato.endereco||''} onChange={e=>setNovoContrato({...novoContrato,endereco:e.target.value})} placeholder="Ex: Rua Vereador Sidney Barth, nº 1.059" className={inputCls}/></div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={labelCls}>Tipo</label><select value={novoContrato.tipo} onChange={e=>setNovoContrato({...novoContrato,tipo:e.target.value})} className={inputCls}><option>Venda</option><option>Locação</option><option>Permuta</option></select></div>
           <div><label className={labelCls}>Valor</label><input type="text" value={novoContrato.valor} onChange={e=>setNovoContrato({...novoContrato,valor:e.target.value})} placeholder="R$ 000,00" className={inputCls}/></div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={labelCls}>Data Início</label><input type="date" value={novoContrato.dataInicio} onChange={e=>setNovoContrato({...novoContrato,dataInicio:e.target.value})} className={inputCls}/></div>
           <div><label className={labelCls}>Vencimento</label><input type="date" value={novoContrato.dataVencimento} onChange={e=>setNovoContrato({...novoContrato,dataVencimento:e.target.value})} className={inputCls}/></div>
         </div>
