@@ -270,9 +270,10 @@ function G4Investimoveis(){
   const[contratos,setContratos]=useState([]);
   const[showContratoModal,setShowContratoModal]=useState(false);
   const[editingContrato,setEditingContrato]=useState(null);
-  const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+  const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[buscaContrato,setBuscaContrato]=useState('');
+  const[buscaVisita,setBuscaVisita]=useState('');
   const[showGerador,setShowGerador]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
     tipoImovel:'',genero:'feminino',nome:'',nacionalidade:'brasileira',profissao:'',portadorGenero:'portadora',
@@ -490,7 +491,7 @@ function G4Investimoveis(){
     if(!novoContrato.cliente)return;
     const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now(),checklist:[false,false,false,false,false,false,false,false,false]};
     await fsAdd('contratos',item);
-    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});
   };
 
   const handleImageUpload=async(contrato,file)=>{
@@ -512,6 +513,58 @@ function G4Investimoveis(){
     const completos=cl.filter(Boolean).length;
     return{completos,total,isCompleto:completos===total};
   };
+
+  // VISITAS A IMÓVEIS
+  const TIPOS_IMOVEL=['Lote','Casa','Apartamento','Comercial','Outro'];
+  const diasDesdeVisita=(c)=>{
+    if(!c.ultimaVisita)return Infinity;
+    const v=new Date(c.ultimaVisita+'T00:00:00');const hj=new Date();hj.setHours(0,0,0,0);
+    return Math.floor((hj-v)/(1000*60*60*24));
+  };
+  const marcarVisita=async(c)=>{
+    const hj=new Date();const hjStr=`${hj.getFullYear()}-${String(hj.getMonth()+1).padStart(2,'0')}-${String(hj.getDate()).padStart(2,'0')}`;
+    await fsAdd('contratos',{...c,ultimaVisita:hjStr});
+  };
+  const ordenarPorPrioridadeVisita=(a,b)=>{
+    const prioA=a.tipoImovel==='Lote'?0:1;const prioB=b.tipoImovel==='Lote'?0:1;
+    if(prioA!==prioB)return prioA-prioB;
+    return diasDesdeVisita(b)-diasDesdeVisita(a);
+  };
+  const imoveisParaVisitar=useMemo(()=>contratos
+    .filter(c=>c.status==='ativo'&&getChecklistProgress(c).isCompleto)
+    .sort(ordenarPorPrioridadeVisita),[contratos]);
+  const imoveisAtrasadosVisita=useMemo(()=>imoveisParaVisitar
+    .filter(c=>diasDesdeVisita(c)>=30),[imoveisParaVisitar]);
+  const imoveisVisitaFiltrados=useMemo(()=>{
+    if(!buscaVisita)return imoveisParaVisitar;
+    const b=buscaVisita.toLowerCase();
+    return imoveisParaVisitar.filter(c=>{
+      const nome=(c.cliente||'').toLowerCase();
+      const endereco=(c.endereco||c.imovel||'').toLowerCase();
+      return nome.includes(b)||endereco.includes(b);
+    });
+  },[imoveisParaVisitar,buscaVisita]);
+
+  // Lembrete automático e único: aparece no dia seguinte quando algum imóvel fica atrasado para visita
+  useEffect(()=>{
+    const REMINDER_ID='auto-visita-imoveis';
+    const existente=tarefas.find(t=>String(t.id)===REMINDER_ID);
+    if(imoveisAtrasadosVisita.length===0){
+      if(existente)fsDel('tarefas',existente._docId||REMINDER_ID);
+      return;
+    }
+    const precisaCriar=!existente||(existente.concluida&&existente.data<hojeStr);
+    if(precisaCriar){
+      const amanha=new Date();amanha.setDate(amanha.getDate()+1);
+      const amanhaStr=`${amanha.getFullYear()}-${String(amanha.getMonth()+1).padStart(2,'0')}-${String(amanha.getDate()).padStart(2,'0')}`;
+      fsAdd('tarefas',{
+        id:REMINDER_ID,
+        titulo:`📍 ${imoveisAtrasadosVisita.length} imóvel(is) atrasado(s) para visita`,
+        descricao:'Confira a aba Visitas.',
+        data:amanhaStr,hora:'',prioridade:'alta',concluida:false
+      });
+    }
+  },[imoveisAtrasadosVisita]);
 
   const toggleChecklistItem=async(contrato,index)=>{
     const cl=[...(contrato.checklist||[false,false,false,false,false,false,false,false,false])];
@@ -604,10 +657,10 @@ function G4Investimoveis(){
             </div>
             {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
             {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
+            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
             {abaAtiva==='emAndamento'&&(
               <div className="flex gap-2">
-                <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
+                <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
                   <Icons.Plus/>Adicionar Contrato
                 </button>
                 <button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}>
@@ -620,7 +673,7 @@ function G4Investimoveis(){
       </div>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex gap-0 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
-          {[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0}].map(t=>(
+          {[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0},{k:'visitas',l:'Visitas',I:Icons.MapPin,b:imoveisAtrasadosVisita.length}].map(t=>(
             <button key={t.k} onClick={()=>setAbaAtiva(t.k)}
               className={`flex items-center gap-2 shrink-0 px-3 sm:px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
               <t.I/>{t.l}
@@ -987,6 +1040,7 @@ function G4Investimoveis(){
                           <h3 className="text-lg font-semibold">{c.cliente}</h3>
                           <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
                           <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
+                          {c.tipoImovel&&<span className={`px-3 py-1 text-xs font-bold rounded-full ${c.tipoImovel==='Lote'?'bg-purple-100 text-purple-700 border border-purple-300':'bg-white/50 border'}`}>{c.tipoImovel}</span>}
                           <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
                             {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
                           </span>
@@ -1022,6 +1076,64 @@ function G4Investimoveis(){
           })}
         </div>
         {contratos.length===0&&<div className="text-center py-16"><p className="text-gray-400">Nenhum contrato cadastrado</p></div>}
+      </main>
+    )}
+
+    {/* ====== ABA VISITAS ====== */}
+    {abaAtiva==='visitas'&&(
+      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+        <h2 className="text-2xl font-bold text-gray-800 mb-1 flex items-center gap-2"><Icons.MapPin/>Visitas aos Imóveis</h2>
+        <p className="text-sm text-gray-500 mb-6">Ordenado por prioridade: lotes primeiro, depois quem está há mais tempo sem visita.</p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <p className="text-gray-500 text-sm">Imóveis ativos</p>
+            <p className="text-2xl font-bold text-gray-800">{imoveisParaVisitar.length}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <p className="text-gray-500 text-sm">Atrasados (30+ dias)</p>
+            <p className="text-2xl font-bold text-purple-600">{imoveisAtrasadosVisita.length}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <p className="text-gray-500 text-sm">Em dia</p>
+            <p className="text-2xl font-bold text-green-600">{imoveisParaVisitar.length-imoveisAtrasadosVisita.length}</p>
+          </div>
+        </div>
+
+        {/* Barra de Pesquisa */}
+        <div className="mb-6">
+          <div className="relative">
+            <Icons.Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"/>
+            <input
+              type="text"
+              placeholder="Buscar por nome ou endereço..."
+              value={buscaVisita}
+              onChange={(e)=>setBuscaVisita(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 focus:outline-none transition-colors"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          {imoveisVisitaFiltrados.length>0?imoveisVisitaFiltrados.map(c=>{
+            const dv=diasDesdeVisita(c);
+            const atrasado=dv>=30;
+            return(<div key={c.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${atrasado?'border-purple-200':'border-gray-200'}`}>
+              <div className="p-4">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                  {c.tipoImovel&&<span className={`px-2.5 py-1 text-xs font-bold rounded-full ${c.tipoImovel==='Lote'?'bg-purple-100 text-purple-700 border border-purple-300':'bg-gray-100 text-gray-600 border border-gray-300'}`}>{c.tipoImovel}</span>}
+                  <span className="font-semibold text-gray-800">{c.cliente}</span>
+                  {!atrasado&&c.ultimaVisita&&<span className="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-300">Em dia</span>}
+                </div>
+                <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-1.5"><Icons.MapPin className="w-4 h-4 shrink-0"/>{c.endereco||c.imovel||'—'}</div>
+                <div className={`text-xs font-semibold ${atrasado?'text-red-600':'text-gray-500'}`}>
+                  {c.ultimaVisita?`${dv===0?'Visitado hoje':`Visitado há ${dv} dias`} (última em ${fmtData(c.ultimaVisita)})`:'Ainda não foi visitado'}
+                </div>
+              </div>
+              <button onClick={()=>marcarVisita(c)} className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 text-white font-semibold hover:bg-purple-700 transition-colors border-t border-purple-100"><Icons.Check/>Visitei hoje</button>
+            </div>);
+          }):<div className="text-center py-16"><p className="text-gray-400">{buscaVisita?'Nenhum imóvel encontrado para essa busca.':'Nenhum imóvel ativo para visitar ainda.'}</p></div>}
+        </div>
       </main>
     )}
 
@@ -1371,6 +1483,7 @@ function G4Investimoveis(){
           <div><label className={labelCls}>Tipo</label><select value={novoContrato.tipo} onChange={e=>setNovoContrato({...novoContrato,tipo:e.target.value})} className={inputCls}><option>Venda</option><option>Locação</option><option>Permuta</option></select></div>
           <div><label className={labelCls}>Valor</label><input type="text" value={novoContrato.valor} onChange={e=>setNovoContrato({...novoContrato,valor:e.target.value})} placeholder="R$ 000,00" className={inputCls}/></div>
         </div>
+        <div><label className={labelCls}>Tipo de Imóvel</label><select value={novoContrato.tipoImovel||''} onChange={e=>setNovoContrato({...novoContrato,tipoImovel:e.target.value})} className={inputCls}><option value="">Selecione</option>{TIPOS_IMOVEL.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={labelCls}>Data Início</label><input type="date" value={novoContrato.dataInicio} onChange={e=>setNovoContrato({...novoContrato,dataInicio:e.target.value})} className={inputCls}/></div>
           <div><label className={labelCls}>Vencimento</label><input type="date" value={novoContrato.dataVencimento} onChange={e=>setNovoContrato({...novoContrato,dataVencimento:e.target.value})} className={inputCls}/></div>
