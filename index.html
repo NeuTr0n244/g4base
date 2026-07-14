@@ -517,8 +517,9 @@ function G4Investimoveis(){
   // VISITAS A IMÓVEIS
   const TIPOS_IMOVEL=['Lote','Casa','Apartamento','Comercial','Outro'];
   const diasDesdeVisita=(c)=>{
-    if(!c.ultimaVisita)return Infinity;
-    const v=new Date(c.ultimaVisita+'T00:00:00');const hj=new Date();hj.setHours(0,0,0,0);
+    const base=c.ultimaVisita||c.dataInicio;
+    if(!base)return Infinity;
+    const v=new Date(base+'T00:00:00');const hj=new Date();hj.setHours(0,0,0,0);
     return Math.floor((hj-v)/(1000*60*60*24));
   };
   const marcarVisita=async(c)=>{
@@ -596,6 +597,59 @@ function G4Investimoveis(){
   const labelCls="block text-gray-600 text-sm mb-1.5";
   const btnGrad="px-5 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-semibold hover:from-red-500 hover:to-orange-400 transition-all shadow-lg";
 
+  const NAV_TABS=[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0},{k:'visitas',l:'Visitas',I:Icons.MapPin,b:imoveisAtrasadosVisita.length}];
+
+  const renderNotifBell=(dark)=>(
+    <div className="relative">
+      <button onClick={async()=>{
+        if(!showNotificacoes){
+          setNotifsVistas(totalNotifs);
+          try{await db.collection('_config').doc('notifsVistas').set({count:totalNotifs});}catch(e){console.error('Erro salvar notifs:',e);}
+        }
+        setShowNotificacoes(!showNotificacoes);
+      }} className={`relative p-2.5 transition-colors ${dark?'text-gray-400 hover:text-white':'text-gray-500 hover:text-gray-800'}`}>
+        <Icons.Bell/>
+        {totalNotifs>0&&totalNotifs!==notifsVistas&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
+      </button>
+      {showNotificacoes&&(
+        <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] max-w-sm sm:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
+          <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Notificações</h3></div>
+          <div className="max-h-80 overflow-y-auto">
+            {contratosVencidos.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
+              <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Contratos Vencidos ({contratosVencidos.length})</div>
+              {contratosVencidos.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-red-700">{c.cliente}</p><p className="text-xs text-red-500">{c.imovel} - Venceu {fmtData(c.dataVencimento)}</p></div>)}
+            </div>}
+            {contratosVencendo.length>0&&<div className="p-3 bg-amber-50 border-b border-amber-100">
+              <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm mb-2"><Icons.Clock/>Contratos Vencendo ({contratosVencendo.length})</div>
+              {contratosVencendo.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-amber-700">{c.cliente}</p><p className="text-xs text-amber-500">{c.imovel} - {diasRestantes(c.dataVencimento)} dias restantes</p></div>)}
+            </div>}
+            {tarefasAtrasadas.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
+              <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Tarefas Atrasadas ({tarefasAtrasadas.length})</div>
+              {tarefasAtrasadas.map(t=><div key={t.id} className="flex items-center justify-between py-1.5"><div><p className="text-sm font-medium text-red-700">{t.titulo}</p><p className="text-xs text-red-500">{fmtData(t.data)}</p></div><button onClick={()=>toggleConcluida(t.id)} className="p-1 text-red-400 hover:text-green-500"><Icons.Check/></button></div>)}
+            </div>}
+            {totalNotifs===0&&<div className="p-6 text-center text-gray-400"><p className="text-sm">Tudo em dia! ✓</p></div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const acaoBtnHeader=(<>
+    {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
+    {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
+    {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
+    {abaAtiva==='emAndamento'&&(
+      <div className="flex gap-2">
+        <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
+          <Icons.Plus/>Adicionar Contrato
+        </button>
+        <button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}>
+          <Icons.Plus/>Gerar Novo Contrato
+        </button>
+      </div>
+    )}
+  </>);
+
   if(loading) return(
     <div className="min-h-screen bg-gray-800 flex flex-col items-center justify-center">
       <img src={LOGO_SRC} alt="G4" className="h-20 w-auto rounded mb-6"/>
@@ -623,57 +677,14 @@ function G4Investimoveis(){
             </div>
           </div>
           <div className="flex items-center flex-wrap gap-2 sm:gap-3">
-            <div className="relative">
-              <button onClick={async()=>{
-                if(!showNotificacoes){
-                  setNotifsVistas(totalNotifs);
-                  try{await db.collection('_config').doc('notifsVistas').set({count:totalNotifs});}catch(e){console.error('Erro salvar notifs:',e);}
-                }
-                setShowNotificacoes(!showNotificacoes);
-              }} className="relative p-2.5 text-gray-400 hover:text-white transition-colors">
-                <Icons.Bell/>
-                {totalNotifs>0&&totalNotifs!==notifsVistas&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
-              </button>
-              {showNotificacoes&&(
-                <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] max-w-sm sm:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
-                  <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Notificações</h3></div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {contratosVencidos.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
-                      <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Contratos Vencidos ({contratosVencidos.length})</div>
-                      {contratosVencidos.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-red-700">{c.cliente}</p><p className="text-xs text-red-500">{c.imovel} - Venceu {fmtData(c.dataVencimento)}</p></div>)}
-                    </div>}
-                    {contratosVencendo.length>0&&<div className="p-3 bg-amber-50 border-b border-amber-100">
-                      <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm mb-2"><Icons.Clock/>Contratos Vencendo ({contratosVencendo.length})</div>
-                      {contratosVencendo.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-amber-700">{c.cliente}</p><p className="text-xs text-amber-500">{c.imovel} - {diasRestantes(c.dataVencimento)} dias restantes</p></div>)}
-                    </div>}
-                    {tarefasAtrasadas.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
-                      <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Tarefas Atrasadas ({tarefasAtrasadas.length})</div>
-                      {tarefasAtrasadas.map(t=><div key={t.id} className="flex items-center justify-between py-1.5"><div><p className="text-sm font-medium text-red-700">{t.titulo}</p><p className="text-xs text-red-500">{fmtData(t.data)}</p></div><button onClick={()=>toggleConcluida(t.id)} className="p-1 text-red-400 hover:text-green-500"><Icons.Check/></button></div>)}
-                    </div>}
-                    {totalNotifs===0&&<div className="p-6 text-center text-gray-400"><p className="text-sm">Tudo em dia! ✓</p></div>}
-                  </div>
-                </div>
-              )}
-            </div>
-            {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
-            {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
-            {abaAtiva==='emAndamento'&&(
-              <div className="flex gap-2">
-                <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
-                  <Icons.Plus/>Adicionar Contrato
-                </button>
-                <button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}>
-                  <Icons.Plus/>Gerar Novo Contrato
-                </button>
-              </div>
-            )}
+            {renderNotifBell(true)}
+            {acaoBtnHeader}
           </div>
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex gap-0 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
-          {[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0},{k:'visitas',l:'Visitas',I:Icons.MapPin,b:imoveisAtrasadosVisita.length}].map(t=>(
+          {NAV_TABS.map(t=>(
             <button key={t.k} onClick={()=>setAbaAtiva(t.k)}
               className={`flex items-center gap-2 shrink-0 px-3 sm:px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
               <t.I/>{t.l}
@@ -688,8 +699,8 @@ function G4Investimoveis(){
     {abaAtiva==='home'&&(
       <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
         {tarefasAtrasadas.length>0&&<div className="bg-red-500 text-white py-2.5 px-4 rounded-xl mb-4"><div className="flex items-center gap-2 text-sm"><Icons.AlertTriangle/><span className="font-semibold">Atenção!</span> {tarefasAtrasadas.length} tarefa(s) atrasada(s)</div></div>}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-4">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between p-5 bg-gray-800">
                 {visaoCalendario!=='semana'?(<>
@@ -711,11 +722,11 @@ function G4Investimoveis(){
                 <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
                   const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
                   const isH=ds===hojeStr;const isS=diaSelecionado===ds;
-                  return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[56px] md:min-h-[140px] p-1 md:p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
+                  return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[56px] md:min-h-[150px] p-1 md:p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
                     {dia&&<>
                       <div className="flex items-center justify-center md:justify-between"><span className={`text-xs md:text-lg font-semibold w-6 h-6 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
                       {tD.length>0&&<div className="md:hidden flex flex-wrap justify-center gap-0.5 mt-1">{tD.slice(0,5).map(t=><span key={t.id} className={`w-1.5 h-1.5 rounded-full ${t.concluida?'bg-gray-300':t.data<hojeStr?'bg-red-500':getPC(t.prioridade)}`}></span>)}{tD.length>5&&<span className="text-[9px] text-gray-400 leading-none">+{tD.length-5}</span>}</div>}
-                      <div className="hidden md:block mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-1 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div>
+                      <div className="hidden md:block mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-xs px-1.5 py-0.5 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-xs text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div>
                     </>}
                   </div>);
                 })}</div>
@@ -1118,19 +1129,26 @@ function G4Investimoveis(){
           {imoveisVisitaFiltrados.length>0?imoveisVisitaFiltrados.map(c=>{
             const dv=diasDesdeVisita(c);
             const atrasado=dv>=30;
-            return(<div key={c.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${atrasado?'border-purple-200':'border-gray-200'}`}>
+            const visitado=!atrasado&&!!c.ultimaVisita;
+            const cor=atrasado?'red':visitado?'gray':'green';
+            const estilos={
+              red:{card:'border-red-200',badge:'bg-red-100 text-red-700 border border-red-300',status:'text-red-600',btn:'bg-red-600 hover:bg-red-700 border-red-100'},
+              green:{card:'border-green-200',badge:'bg-green-100 text-green-700 border border-green-300',status:'text-green-600',btn:'bg-green-600 hover:bg-green-700 border-green-100'},
+              gray:{card:'border-gray-200 opacity-75',badge:'bg-gray-100 text-gray-500 border border-gray-300',status:'text-gray-400',btn:'bg-gray-400 hover:bg-gray-500 border-gray-100'},
+            }[cor];
+            return(<div key={c.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${estilos.card}`}>
               <div className="p-4">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   {c.tipoImovel&&<span className={`px-2.5 py-1 text-xs font-bold rounded-full ${c.tipoImovel==='Lote'?'bg-purple-100 text-purple-700 border border-purple-300':'bg-gray-100 text-gray-600 border border-gray-300'}`}>{c.tipoImovel}</span>}
                   <span className="font-semibold text-gray-800">{c.cliente}</span>
-                  {!atrasado&&c.ultimaVisita&&<span className="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-300">Em dia</span>}
+                  <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${estilos.badge}`}>{atrasado?'Atrasado':visitado?'Em dia':'Precisa visitar'}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-1.5"><Icons.MapPin className="w-4 h-4 shrink-0"/>{c.endereco||c.imovel||'—'}</div>
-                <div className={`text-xs font-semibold ${atrasado?'text-red-600':'text-gray-500'}`}>
+                <div className={`text-xs font-semibold ${estilos.status}`}>
                   {c.ultimaVisita?`${dv===0?'Visitado hoje':`Visitado há ${dv} dias`} (última em ${fmtData(c.ultimaVisita)})`:'Ainda não foi visitado'}
                 </div>
               </div>
-              <button onClick={()=>marcarVisita(c)} className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 text-white font-semibold hover:bg-purple-700 transition-colors border-t border-purple-100"><Icons.Check/>Visitei hoje</button>
+              <button onClick={()=>marcarVisita(c)} className={`w-full flex items-center justify-center gap-2 py-3 text-white font-semibold transition-colors border-t ${estilos.btn}`}><Icons.Check/>Visitei hoje</button>
             </div>);
           }):<div className="text-center py-16"><p className="text-gray-400">{buscaVisita?'Nenhum imóvel encontrado para essa busca.':'Nenhum imóvel ativo para visitar ainda.'}</p></div>}
         </div>
