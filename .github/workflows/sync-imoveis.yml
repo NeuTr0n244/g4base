@@ -1,16 +1,29 @@
 name: Sincronizar imóveis do site público
 
+# O agendador "schedule" do GitHub Actions não garante o horário exato (pode atrasar
+# horas em contas gratuitas). Por isso o job roda em loop interno, checando a cada
+# 15 minutos de verdade por ~5h40, e o cron só reinicia esse loop a cada 6 horas
+# (rede de segurança caso o job pare por qualquer motivo).
+
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch: {}
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: node scripts/sync-imoveis.js
+      - name: Loop de sincronização a cada 15 minutos
+        run: |
+          FIM=$((SECONDS + 340*60))
+          while [ $SECONDS -lt $FIM ]; do
+            echo "=== $(date -u +%H:%M:%SZ) UTC ==="
+            node scripts/sync-imoveis.js
+            sleep 900
+          done
