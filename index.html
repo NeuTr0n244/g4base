@@ -273,6 +273,7 @@ function G4Investimoveis(){
   const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[buscaContrato,setBuscaContrato]=useState('');
+  const[ordemContrato,setOrdemContrato]=useState('vencimento');
   const[buscaVisita,setBuscaVisita]=useState('');
   const[showGerador,setShowGerador]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
@@ -642,11 +643,12 @@ function G4Investimoveis(){
     });
   },[imoveisParaVisitar,buscaVisita]);
 
-  // Lembrete automático e único: aparece no dia seguinte quando algum imóvel fica atrasado para visita
+  // Lembrete automático e único: aparece no dia seguinte quando TODOS os imóveis ficam atrasados para visita
   useEffect(()=>{
     const REMINDER_ID='auto-visita-imoveis';
     const existente=tarefas.find(t=>String(t.id)===REMINDER_ID);
-    if(imoveisAtrasadosVisita.length===0){
+    const todosAtrasados=imoveisParaVisitar.length>0&&imoveisAtrasadosVisita.length===imoveisParaVisitar.length;
+    if(!todosAtrasados){
       if(existente)fsDel('tarefas',existente._docId||REMINDER_ID);
       return;
     }
@@ -656,12 +658,12 @@ function G4Investimoveis(){
       const amanhaStr=`${amanha.getFullYear()}-${String(amanha.getMonth()+1).padStart(2,'0')}-${String(amanha.getDate()).padStart(2,'0')}`;
       fsAdd('tarefas',{
         id:REMINDER_ID,
-        titulo:`📍 ${imoveisAtrasadosVisita.length} imóvel(is) atrasado(s) para visita`,
+        titulo:`📍 Todos os ${imoveisParaVisitar.length} imóveis estão atrasados para visita`,
         descricao:'Confira a aba Visitas.',
         data:amanhaStr,hora:'',prioridade:'alta',concluida:false
       });
     }
-  },[imoveisAtrasadosVisita]);
+  },[imoveisAtrasadosVisita,imoveisParaVisitar]);
 
   const toggleChecklistItem=async(contrato,index)=>{
     const cl=[...(contrato.checklist||[false,false,false,false,false,false,false,false,false])];
@@ -1102,9 +1104,9 @@ function G4Investimoveis(){
         {/* Lista de Contratos */}
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Contratos Ativos</h2>
 
-        {/* Barra de Pesquisa */}
-        <div className="mb-6">
-          <div className="relative">
+        {/* Barra de Pesquisa e Ordenação */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
             <Icons.Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"/>
             <input
               type="text"
@@ -1114,6 +1116,15 @@ function G4Investimoveis(){
               className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 focus:outline-none transition-colors"
             />
           </div>
+          <select
+            value={ordemContrato}
+            onChange={(e)=>setOrdemContrato(e.target.value)}
+            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 focus:outline-none transition-colors bg-white sm:w-64"
+          >
+            <option value="vencimento">Ordenar: Vencimento (padrão)</option>
+            <option value="recentes">Ordenar: Mais recentes primeiro</option>
+            <option value="antigos">Ordenar: Mais antigos primeiro</option>
+          </select>
         </div>
 
         <h3 className="text-lg font-bold text-gray-800 mb-4">Lista de Contratos</h3>
@@ -1130,6 +1141,8 @@ function G4Investimoveis(){
               return nome.includes(busca)||endereco.includes(busca)||codigo.includes(busca);
             })
             .sort((a,b)=>{
+              if(ordemContrato==='recentes')return (b.dataInicio||'').localeCompare(a.dataInicio||'');
+              if(ordemContrato==='antigos')return (a.dataInicio||'').localeCompare(b.dataInicio||'');
               const diasA=diasRestantes(a.dataVencimento);
               const diasB=diasRestantes(b.dataVencimento);
               return diasA-diasB; // menor (negativo/vencido) primeiro

@@ -1,10 +1,10 @@
-// Sincroniza imóveis novos do site público (g4-investimoveis) para o G4 (g4base-41f45).
-// Só lê do site público, nunca escreve nele. Cria contratos incompletos (0/9) na aba "Em Andamento" do G4.
-// Roda via GitHub Actions a cada 15 minutos (.github/workflows/sync-imoveis.yml).
+// Sincroniza imóveis do site público (g4-investimoveis) para o G4 (g4base-41f45).
+// Só lê do site público, nunca escreve nele. Cria/atualiza contratos completos (9/9) na aba "Contratos" do G4.
+// Roda via GitHub Actions a cada 15 minutos (.github/workflows/sync-imoveis.yml), mantendo os dados
+// (valor, endereço, fotos, proprietário, data do contrato) sempre espelhados com o site público.
 
 const SITE_PROJECT = 'g4-investimoveis';
 const G4_PROJECT = 'g4base-41f45';
-const CUTOFF_DATE = '2026-07-15'; // só sincroniza imóveis criados a partir desta data (não traz o histórico antigo)
 
 const TIPOS_VALIDOS = ['Lote', 'Casa', 'Apartamento', 'Comercial', 'Outro'];
 
@@ -71,8 +71,8 @@ function mapearTipoNegocio(transaction) {
 async function main() {
   console.log('Buscando imóveis ativos no site público...');
   const properties = await listAllDocs(SITE_PROJECT, 'properties');
-  const novos = properties.filter(p => p.active === true && (p.createdAt || '') >= CUTOFF_DATE);
-  console.log(`Imóveis ativos criados a partir de ${CUTOFF_DATE}: ${novos.length}`);
+  const novos = properties.filter(p => p.active === true);
+  console.log(`Imóveis ativos no site público: ${novos.length}`);
 
   if (novos.length === 0) {
     console.log('Nada novo para sincronizar.');
@@ -81,19 +81,28 @@ async function main() {
 
   for (const p of novos) {
     const contratoId = `site-${p.id}`;
+    const hoje = new Date();
+    // dataInicio vem da data do contrato informada no site público (campo `contractDate`),
+    // com fallback para a data em que o sync rodou, caso o imóvel ainda não tenha esse campo.
+    const dataInicioStr = p.contractDate || hoje.toISOString().split('T')[0];
+    const vencimento = new Date(dataInicioStr + 'T00:00:00');
+    vencimento.setMonth(vencimento.getMonth() + 12);
     const contrato = {
       id: contratoId,
-      cliente: `Aguardando cliente — Ref. ${p.reference || p.id}`,
+      // cliente vem do nome do proprietário informado no site público (campo `ownerName`),
+      // com fallback para o placeholder antigo caso o imóvel ainda não tenha esse campo.
+      cliente: p.ownerName || `Aguardando cliente — Ref. ${p.reference || p.id}`,
       tipo: mapearTipoNegocio(p.transaction),
       tipoImovel: mapearTipoImovel(p.type),
       valor: p.price ? `R$ ${Number(p.price).toLocaleString('pt-BR')}` : '',
       endereco: montarEndereco(p),
       codigoRef: p.reference || '',
       imagemUrl: (p.images && p.images[0]) || '',
-      dataInicio: '',
-      dataVencimento: '',
+      dataInicio: dataInicioStr,
+      dataVencimento: vencimento.toISOString().split('T')[0],
       status: 'ativo',
-      checklist: [false, false, false, false, false, false, false, false, false],
+      // Checklist já entra completo (9/9) para o contrato cair direto na aba "Contratos", não em "Em Andamento".
+      checklist: [true, true, true, true, true, true, true, true, true],
       ultimaVisita: '',
     };
 
