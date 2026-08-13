@@ -24,7 +24,7 @@
     const db = firebase.firestore();
   </script>
   <style>
-    body{margin:0;padding:0}
+    html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
     .notif-slide{animation:slideIn .3s ease-out}.fade-in{animation:fadeIn .3s ease-out}
@@ -540,6 +540,41 @@ function G4Investimoveis(){
     .sort(ordenarPorPrioridadeVisita),[contratos]);
   const imoveisAtrasadosVisita=useMemo(()=>imoveisParaVisitar
     .filter(c=>diasDesdeVisita(c)>=30),[imoveisParaVisitar]);
+  const imoveisComManutencao=useMemo(()=>contratos.filter(c=>c.precisaManutencao),[contratos]);
+  const paradaParaImovel=(c)=>{
+    if(c.lat&&c.lng)return `${c.lat},${c.lng}`;
+    const end=c.endereco||c.imovel||'';
+    if(!end)return '';
+    return /mambor/i.test(end)?end:`${end}, Mamborê/PR`;
+  };
+  const montarUrlRota=(lista)=>{
+    const paradas=lista.map(paradaParaImovel).filter(Boolean);
+    if(paradas.length===0)return '';
+    const destino=paradas[paradas.length-1];
+    const waypoints=paradas.slice(0,-1);
+    let url=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+    if(waypoints.length>0)url+=`&waypoints=optimize:true|${waypoints.map(w=>encodeURIComponent(w)).join('|')}`;
+    return url;
+  };
+  const urlRotaManutencao=useMemo(()=>montarUrlRota(imoveisComManutencao),[imoveisComManutencao]);
+  const urlRotaVisitas=useMemo(()=>montarUrlRota(imoveisParaVisitar),[imoveisParaVisitar]);
+  const extrairCoordenadas=(texto)=>{
+    let m=texto.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if(m)return{lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+    m=texto.match(/[?&](?:q|ll)=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if(m)return{lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+    m=texto.match(/^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+    if(m)return{lat:parseFloat(m[1]),lng:parseFloat(m[2])};
+    return null;
+  };
+  const definirLocalizacao=async(c)=>{
+    const atual=c.lat&&c.lng?`${c.lat}, ${c.lng}`:'';
+    const input=window.prompt('Cole o link do Google Maps deste imóvel (Compartilhar > Copiar link), ou as coordenadas "latitude, longitude":',atual);
+    if(input===null||input.trim()==='')return;
+    const coords=extrairCoordenadas(input.trim());
+    if(!coords){alert('Não consegui identificar a localização. Copie o link do Google Maps (Compartilhar > Copiar link) ou as coordenadas no formato "latitude, longitude".');return;}
+    await fsAdd('contratos',{...c,lat:coords.lat,lng:coords.lng});
+  };
   const imoveisVisitaFiltrados=useMemo(()=>{
     if(!buscaVisita)return imoveisParaVisitar;
     const b=buscaVisita.toLowerCase();
@@ -666,7 +701,7 @@ function G4Investimoveis(){
     {syncStatus&&<div className={`fixed top-2 right-2 z-50 px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg transition-all ${syncStatus.startsWith('✓')?'bg-green-500 text-white':syncStatus.startsWith('❌')?'bg-red-600 text-white':syncStatus.startsWith('⚠')?'bg-yellow-500 text-white':'bg-blue-500 text-white'}`}>{syncStatus}</div>}
     {/* HEADER */}
     <header className="bg-gray-800 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-[1600px] mx-auto px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 sm:gap-4">
             <img src={LOGO_SRC} alt="G4" className="h-10 sm:h-14 w-auto rounded"/>
@@ -681,7 +716,7 @@ function G4Investimoveis(){
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-[1600px] mx-auto px-4">
         <div className="flex gap-0 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
           {NAV_TABS.map(t=>(
             <button key={t.k} onClick={()=>setAbaAtiva(t.k)}
@@ -696,10 +731,29 @@ function G4Investimoveis(){
 
     {/* ====== ABA HOME ====== */}
     {abaAtiva==='home'&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
-        {tarefasAtrasadas.length>0&&<div className="bg-red-500 text-white py-2.5 px-4 rounded-xl mb-4"><div className="flex items-center gap-2 text-sm"><Icons.AlertTriangle/><span className="font-semibold">Atenção!</span> {tarefasAtrasadas.length} tarefa(s) atrasada(s)</div></div>}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-4">
+      <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in overflow-x-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+          {(tarefasAtrasadas.length>0||imoveisComManutencao.length>0)&&(
+            <div className="lg:col-span-1 lg:order-1">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Icons.AlertTriangle className="text-red-500"/>Avisos</h3>
+                </div>
+                <div className="p-4 space-y-3">
+                  {tarefasAtrasadas.length>0&&<div className="bg-red-50 border border-red-200 text-red-700 py-2.5 px-4 rounded-lg text-sm font-semibold flex flex-wrap items-center gap-2"><Icons.AlertTriangle/><span className="break-words">{tarefasAtrasadas.length} tarefa(s) atrasada(s)</span></div>}
+                  {imoveisComManutencao.length>0&&(
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="flex flex-wrap items-center gap-2 text-red-700 text-sm font-semibold mb-2"><Icons.AlertTriangle className="shrink-0"/><span className="break-words">⚠ {imoveisComManutencao.length} imóvel(is) precisando de manutenção</span></div>
+                      <a href={urlRotaManutencao} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-xs">
+                        <Icons.MapPin/>Ver rota no mapa
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          <div className={`min-w-0 lg:order-2 ${(tarefasAtrasadas.length>0||imoveisComManutencao.length>0)?'lg:col-span-4':'lg:col-span-5'}`}>
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between p-5 bg-gray-800">
                 {visaoCalendario!=='semana'?(<>
@@ -749,7 +803,7 @@ function G4Investimoveis(){
               </>)}
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-4 lg:order-3">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="font-bold text-gray-800">{diaSelecionado?`Tarefas - ${fmtData(diaSelecionado)}`:'Selecione um dia'}</h3>
@@ -786,7 +840,7 @@ function G4Investimoveis(){
 
     {/* ====== ABA CLIENTES ====== */}
     {abaAtiva==='clientes'&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+      <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[{l:'Total Clientes',v:stats.total,c:'red',I:Icons.Users},{l:'Locação',v:stats.locacao,c:'emerald',I:Icons.Home},{l:'Compra',v:stats.compra,c:'blue',I:Icons.Building2},{l:'Venda',v:stats.venda,c:'amber',I:Icons.TrendingUp}].map((s,i)=>(
             <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
@@ -844,7 +898,7 @@ function G4Investimoveis(){
     )}
     {/* ====== ABA EM ANDAMENTO ====== */}
     {abaAtiva==='emAndamento'&&!showGerador&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+      <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Contratos em Andamento</h2>
 
         {/* Lista de Contratos em Andamento */}
@@ -956,7 +1010,7 @@ function G4Investimoveis(){
 
     {/* ====== ABA CONTRATOS ====== */}
     {abaAtiva==='contratos'&&!showGerador&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+      <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
         {/* Alerta contratos */}
         {(contratosVencidos.length>0||contratosVencendo.length>0)&&(
           <div className={`${contratosVencidos.length>0?'bg-red-500':'bg-amber-500'} text-white py-2.5 px-4 rounded-xl mb-4`}>
@@ -1092,8 +1146,15 @@ function G4Investimoveis(){
 
     {/* ====== ABA VISITAS ====== */}
     {abaAtiva==='visitas'&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
-        <h2 className="text-2xl font-bold text-gray-800 mb-1 flex items-center gap-2"><Icons.MapPin/>Visitas aos Imóveis</h2>
+      <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Icons.MapPin/>Visitas aos Imóveis</h2>
+          {imoveisParaVisitar.length>0&&(
+            <a href={urlRotaVisitas} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm">
+              <Icons.MapPin/>Ver rota completa no mapa ({imoveisParaVisitar.length})
+            </a>
+          )}
+        </div>
         <p className="text-sm text-gray-500 mb-6">Ordenado por prioridade: quem precisa de manutenção primeiro, depois quem está mais perto de completar 30 dias sem visita.</p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
@@ -1145,6 +1206,9 @@ function G4Investimoveis(){
                   {c.precisaManutencao&&<span className="px-2.5 py-1 text-xs font-bold rounded-full bg-red-600 text-white flex items-center gap-1">⚠ Precisa manutenção</span>}
                 </div>
                 <div className="flex items-center gap-1.5 text-base text-gray-600 mb-1.5"><Icons.MapPin className="w-5 h-5 shrink-0"/>{c.endereco||c.imovel||'—'}</div>
+                <button onClick={()=>definirLocalizacao(c)} className={`text-xs font-semibold mb-1.5 ${c.lat&&c.lng?'text-green-600 hover:text-green-700':'text-blue-600 hover:text-blue-700'}`}>
+                  {c.lat&&c.lng?'✓ Localização exata definida (clique pra ajustar)':'📍 Definir localização exata'}
+                </button>
                 <div className={`text-sm font-semibold ${estilos.status}`}>
                   {c.ultimaVisita?`${dv===0?'Visitado hoje':`Visitado há ${dv} dias`} (última em ${fmtData(c.ultimaVisita)}${c.ultimaVisitaHora?` às ${c.ultimaVisitaHora}`:''})`:'Ainda não foi visitado'}
                 </div>
@@ -1163,7 +1227,7 @@ function G4Investimoveis(){
 
     {/* ====== GERADOR DE CONTRATO ====== */}
     {abaAtiva==='emAndamento'&&showGerador&&(
-      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+      <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
         <div className="flex items-center gap-4 mb-6">
           <button onClick={()=>setShowGerador(false)} className="p-2 bg-gray-200 rounded-xl hover:bg-gray-300"><Icons.ChevronLeft/></button>
           <h2 className="text-xl font-bold text-gray-800">Gerar Contrato de Corretagem</h2>
