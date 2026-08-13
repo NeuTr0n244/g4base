@@ -541,23 +541,80 @@ function G4Investimoveis(){
   const imoveisAtrasadosVisita=useMemo(()=>imoveisParaVisitar
     .filter(c=>diasDesdeVisita(c)>=30),[imoveisParaVisitar]);
   const imoveisComManutencao=useMemo(()=>contratos.filter(c=>c.precisaManutencao),[contratos]);
+  const imoveisParaRota=useMemo(()=>imoveisParaVisitar
+    .filter(c=>c.precisaManutencao||diasDesdeVisita(c)>=30),[imoveisParaVisitar]);
   const paradaParaImovel=(c)=>{
     if(c.lat&&c.lng)return `${c.lat},${c.lng}`;
     const end=c.endereco||c.imovel||'';
     if(!end)return '';
     return /mambor/i.test(end)?end:`${end}, Mamborê/PR`;
   };
+  const distanciaKm=(a,b)=>{
+    const R=6371;
+    const dLat=(b.lat-a.lat)*Math.PI/180;
+    const dLng=(b.lng-a.lng)*Math.PI/180;
+    const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+    return 2*R*Math.asin(Math.sqrt(s));
+  };
+  const distanciaTotal=(rota)=>{
+    let total=0;
+    for(let i=0;i<rota.length-1;i++)total+=distanciaKm(rota[i],rota[i+1]);
+    return total;
+  };
+  const vizinhoMaisProximo=(pontos,inicioIdx)=>{
+    const restante=[...pontos];
+    const ordenado=[restante.splice(inicioIdx,1)[0]];
+    while(restante.length>0){
+      const atual=ordenado[ordenado.length-1];
+      let idx=0,menorDist=Infinity;
+      restante.forEach((c,i)=>{
+        const d=distanciaKm(atual,c);
+        if(d<menorDist){menorDist=d;idx=i;}
+      });
+      ordenado.push(restante.splice(idx,1)[0]);
+    }
+    return ordenado;
+  };
+  const duasOpt=(rotaInicial)=>{
+    let melhor=[...rotaInicial];
+    let melhorou=true;
+    while(melhorou){
+      melhorou=false;
+      for(let i=0;i<melhor.length-2;i++){
+        for(let j=i+2;j<melhor.length;j++){
+          const nova=[...melhor.slice(0,i+1),...melhor.slice(i+1,j+1).reverse(),...melhor.slice(j+1)];
+          if(distanciaTotal(nova)<distanciaTotal(melhor)-1e-9){
+            melhor=nova;
+            melhorou=true;
+          }
+        }
+      }
+    }
+    return melhor;
+  };
+  const ordenarPorProximidade=(lista)=>{
+    const comCoord=lista.filter(c=>c.lat&&c.lng);
+    const semCoord=lista.filter(c=>!(c.lat&&c.lng));
+    if(comCoord.length<=2)return [...comCoord,...semCoord];
+    let melhorRota=null,melhorDist=Infinity;
+    comCoord.forEach((_,idx)=>{
+      const rota=duasOpt(vizinhoMaisProximo(comCoord,idx));
+      const d=distanciaTotal(rota);
+      if(d<melhorDist){melhorDist=d;melhorRota=rota;}
+    });
+    return [...melhorRota,...semCoord];
+  };
   const montarUrlRota=(lista)=>{
-    const paradas=lista.map(paradaParaImovel).filter(Boolean);
+    const paradas=ordenarPorProximidade(lista).map(paradaParaImovel).filter(Boolean);
     if(paradas.length===0)return '';
     const destino=paradas[paradas.length-1];
     const waypoints=paradas.slice(0,-1);
     let url=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&travelmode=driving`;
-    if(waypoints.length>0)url+=`&waypoints=optimize:true|${waypoints.map(w=>encodeURIComponent(w)).join('|')}`;
+    if(waypoints.length>0)url+=`&waypoints=${waypoints.map(w=>encodeURIComponent(w)).join('|')}`;
     return url;
   };
   const urlRotaManutencao=useMemo(()=>montarUrlRota(imoveisComManutencao),[imoveisComManutencao]);
-  const urlRotaVisitas=useMemo(()=>montarUrlRota(imoveisParaVisitar),[imoveisParaVisitar]);
+  const urlRotaVisitas=useMemo(()=>montarUrlRota(imoveisParaRota),[imoveisParaRota]);
   const extrairCoordenadas=(texto)=>{
     let m=texto.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
     if(m)return{lat:parseFloat(m[1]),lng:parseFloat(m[2])};
@@ -1149,9 +1206,9 @@ function G4Investimoveis(){
       <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Icons.MapPin/>Visitas aos Imóveis</h2>
-          {imoveisParaVisitar.length>0&&(
+          {imoveisParaRota.length>0&&(
             <a href={urlRotaVisitas} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm">
-              <Icons.MapPin/>Ver rota completa no mapa ({imoveisParaVisitar.length})
+              <Icons.MapPin/>Ver rota no mapa ({imoveisParaRota.length})
             </a>
           )}
         </div>
