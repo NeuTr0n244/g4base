@@ -12,15 +12,19 @@ function firestoreUrl(project, path) {
   return `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}`;
 }
 
+function valorSimples(v) {
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.integerValue !== undefined) return Number(v.integerValue);
+  if (v.doubleValue !== undefined) return v.doubleValue;
+  if (v.booleanValue !== undefined) return v.booleanValue;
+  return null;
+}
+
 function fieldsToObj(fields) {
   const out = {};
   for (const [k, v] of Object.entries(fields || {})) {
-    if (v.stringValue !== undefined) out[k] = v.stringValue;
-    else if (v.integerValue !== undefined) out[k] = Number(v.integerValue);
-    else if (v.doubleValue !== undefined) out[k] = v.doubleValue;
-    else if (v.booleanValue !== undefined) out[k] = v.booleanValue;
-    else if (v.arrayValue !== undefined) out[k] = (v.arrayValue.values || []).map(x => x.stringValue ?? x);
-    else out[k] = null;
+    if (v.arrayValue !== undefined) out[k] = (v.arrayValue.values || []).map(valorSimples);
+    else out[k] = valorSimples(v);
   }
   return out;
 }
@@ -68,42 +72,88 @@ function mapearTipoNegocio(transaction) {
   return 'Venda';
 }
 
+const PLACEHOLDER_PREFIX = 'Aguardando cliente — Ref.';
+
 async function main() {
   console.log('Buscando imóveis ativos no site público...');
   const properties = await listAllDocs(SITE_PROJECT, 'properties');
-  const novos = properties.filter(p => p.active === true);
-  console.log(`Imóveis ativos no site público: ${novos.length}`);
+  const ativos = properties.filter(p => p.active === true);
+  console.log(`Imóveis ativos no site público: ${ativos.length}`);
 
-  if (novos.length === 0) {
+  if (ativos.length === 0) {
     console.log('Nada novo para sincronizar.');
     return;
   }
 
-  for (const p of novos) {
+  console.log('Buscando contratos já existentes no G4...');
+  const contratosAtuais = await listAllDocs(G4_PROJECT, 'contratos');
+  const existentesPorId = {};
+  contratosAtuais.forEach(c => { existentesPorId[c.id] = c; });
+
+  const hojeStr = new Date().toISOString().split('T')[0];
+
+  for (const p of ativos) {
     const contratoId = `site-${p.id}`;
-    const hoje = new Date();
-    // dataInicio vem da data do contrato informada no site público (campo `contractDate`),
-    // com fallback para a data em que o sync rodou, caso o imóvel ainda não tenha esse campo.
-    const dataInicioStr = p.contractDate || hoje.toISOString().split('T')[0];
-    const vencimento = new Date(dataInicioStr + 'T00:00:00');
-    vencimento.setMonth(vencimento.getMonth() + 12);
-    const contrato = {
-      id: contratoId,
-      // cliente vem do nome do proprietário informado no site público (campo `ownerName`),
-      // com fallback para o placeholder antigo caso o imóvel ainda não tenha esse campo.
-      cliente: p.ownerName || `Aguardando cliente — Ref. ${p.reference || p.id}`,
+    const existente = existentesPorId[contratoId] || null;
+
+    // Campos do próprio imóvel: sempre espelham o site público (preço, endereço, foto, tipo).
+    const camposImovel = {
       tipo: mapearTipoNegocio(p.transaction),
       tipoImovel: mapearTipoImovel(p.type),
       valor: p.price ? `R$ ${Number(p.price).toLocaleString('pt-BR')}` : '',
       endereco: montarEndereco(p),
       codigoRef: p.reference || '',
       imagemUrl: (p.images && p.images[0]) || '',
-      dataInicio: dataInicioStr,
-      dataVencimento: vencimento.toISOString().split('T')[0],
-      status: 'ativo',
-      // Checklist já entra completo (9/9) para o contrato cair direto na aba "Contratos", não em "Em Andamento".
-      checklist: [true, true, true, true, true, true, true, true, true],
-      ultimaVisita: '',
+    };
+
+    // Cliente: assume o nome do proprietário (`ownerName`) quando o site informar, mas nunca
+    // sobrescreve um nome que a equipe já tenha digitado manualmente aqui no G4.
+    const clienteAtual = existente ? existente.cliente : null;
+    const clienteEhPlaceholder = !clienteAtual || clienteAtual.startsWith(PLACEHOLDER_PREFIX);
+    const cliente = clienteEhPlaceholder ? (p.ownerName || `${PLACEHOLDER_PREFIX} ${p.reference || p.id}`) : clienteAtual;
+
+    // Data de início/vencimento: definida uma única vez na criação do contrato (usa a data do
+    // site se já existir nesse momento) e não é mais alterada sozinha depois disso.
+    let dataInicio, dataVencimento;
+    if (existente && existente.dataInicio) {
+      dataInicio = existente.dataInicio;
+      dataVencimento = existente.dataVencimento || dataInicio;
+    } else {
+      dataInicio = p.contractDate || hojeStr;
+      const v = new Date(dataInicio + 'T00:00:00');
+      v.setMonth(v.getMonth() + 12);
+      dataVencimento = v.toISOString().split('T')[0];
+    }
+
+    const mudou = !existente
+      || camposImovel.tipo !== existente.tipo
+      || camposImovel.tipoImovel !== existente.tipoImovel
+      || camposImovel.valor !== existente.valor
+      || camposImovel.endereco !== existente.endereco
+      || camposImovel.codigoRef !== existente.codigoRef
+      || camposImovel.imagemUrl !== existente.imagemUrl
+      || cliente !== clienteAtual;
+
+    if (!mudou) {
+      console.log(`= Sem mudanças: ${cliente} (${camposImovel.endereco})`);
+      continue;
+    }
+
+    // Parte de (existente || {}) pra preservar qualquer outro campo que a equipe já tenha
+    // definido no G4 (status, checklist, última visita, localização, manutenção, etc.) — o
+    // PATCH do Firestore sem updateMask substitui o documento inteiro, então precisamos
+    // reenviar tudo que já estava lá, não só os campos que o sync conhece.
+    const contrato = {
+      ...(existente || {}),
+      id: contratoId,
+      ...camposImovel,
+      cliente,
+      dataInicio,
+      dataVencimento,
+      status: (existente && existente.status) || 'ativo',
+      // Checklist entra completo (9/9) na criação, pra cair direto na aba "Contratos" — depois
+      // disso fica por conta da equipe marcar/desmarcar itens.
+      checklist: (existente && existente.checklist) || [true, true, true, true, true, true, true, true, true],
     };
 
     const url = firestoreUrl(G4_PROJECT, `contratos/${contratoId}`);
