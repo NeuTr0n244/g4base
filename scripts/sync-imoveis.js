@@ -89,12 +89,36 @@ async function main() {
   const contratosAtuais = await listAllDocs(G4_PROJECT, 'contratos');
   const existentesPorId = {};
   contratosAtuais.forEach(c => { existentesPorId[c.id] = c; });
+  // Agrupa por código de referência (qualquer contrato, manual ou sincronizado), pra nunca
+  // duplicar um imóvel que a equipe já cadastrou/nomeou manualmente com outro ID de documento.
+  const existentesPorRef = {};
+  contratosAtuais.forEach(c => {
+    if (!c.codigoRef) return;
+    (existentesPorRef[c.codigoRef] = existentesPorRef[c.codigoRef] || []).push(c);
+  });
 
   const hojeStr = new Date().toISOString().split('T')[0];
 
   for (const p of ativos) {
     const contratoId = `site-${p.id}`;
     const existente = existentesPorId[contratoId] || null;
+
+    // Se já existe outro contrato (com ID diferente) pra essa mesma referência e ele já tem
+    // nome real (não é placeholder), a equipe já cuidou desse imóvel manualmente — não mexe
+    // nele, e apaga a duplicata que o próprio sync criou, se houver.
+    if (p.reference) {
+      const duplicataManual = (existentesPorRef[p.reference] || [])
+        .find(c => c.id !== contratoId && c.cliente && !c.cliente.startsWith(PLACEHOLDER_PREFIX));
+      if (duplicataManual) {
+        if (existente) {
+          await fetch(firestoreUrl(G4_PROJECT, `contratos/${contratoId}`), { method: 'DELETE' });
+          console.log(`🗑 Duplicata removida (Ref. ${p.reference}) — já existe contrato manual "${duplicataManual.cliente}"`);
+        } else {
+          console.log(`↷ Ref. ${p.reference} já tem contrato manual ("${duplicataManual.cliente}") — pulando.`);
+        }
+        continue;
+      }
+    }
 
     // Campos do próprio imóvel: sempre espelham o site público (preço, endereço, foto, tipo).
     const camposImovel = {
