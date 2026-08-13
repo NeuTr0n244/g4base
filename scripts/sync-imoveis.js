@@ -112,14 +112,14 @@ async function main() {
     const clienteEhPlaceholder = !clienteAtual || clienteAtual.startsWith(PLACEHOLDER_PREFIX);
     const cliente = clienteEhPlaceholder ? (p.ownerName || `${PLACEHOLDER_PREFIX} ${p.reference || p.id}`) : clienteAtual;
 
-    // Data de início/vencimento: definida uma única vez na criação do contrato (usa a data do
-    // site se já existir nesse momento) e não é mais alterada sozinha depois disso.
-    let dataInicio, dataVencimento;
-    if (existente && existente.dataInicio) {
-      dataInicio = existente.dataInicio;
-      dataVencimento = existente.dataVencimento || dataInicio;
+    // Data de início: quando o site público tem `contractDate`, ela sempre espelha esse valor
+    // (inclusive quando for corrigida lá depois). Sem `contractDate`, mantém a data que já foi
+    // definida na criação (evita ficar "hoje" toda hora, já que não tem data real pra usar).
+    const dataInicio = p.contractDate || (existente && existente.dataInicio) || hojeStr;
+    let dataVencimento;
+    if (existente && existente.dataInicio === dataInicio && existente.dataVencimento) {
+      dataVencimento = existente.dataVencimento;
     } else {
-      dataInicio = p.contractDate || hojeStr;
       const v = new Date(dataInicio + 'T00:00:00');
       v.setMonth(v.getMonth() + 12);
       dataVencimento = v.toISOString().split('T')[0];
@@ -132,7 +132,8 @@ async function main() {
       || camposImovel.endereco !== existente.endereco
       || camposImovel.codigoRef !== existente.codigoRef
       || camposImovel.imagemUrl !== existente.imagemUrl
-      || cliente !== clienteAtual;
+      || cliente !== clienteAtual
+      || dataInicio !== existente.dataInicio;
 
     if (!mudou) {
       console.log(`= Sem mudanças: ${cliente} (${camposImovel.endereco})`);
