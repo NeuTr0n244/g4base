@@ -261,6 +261,8 @@ function G4Investimoveis(){
   const[editingTarefa,setEditingTarefa]=useState(null);
   const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:''});
   const[diaSelecionado,setDiaSelecionado]=useState(null);
+  const[visaoCalendario,setVisaoCalendario]=useState('grade');
+  const[semanaOffset,setSemanaOffset]=useState(0);
   const[showNotificacoes,setShowNotificacoes]=useState(false);
   const[notifsVistas,setNotifsVistas]=useState(0);
 
@@ -268,9 +270,10 @@ function G4Investimoveis(){
   const[contratos,setContratos]=useState([]);
   const[showContratoModal,setShowContratoModal]=useState(false);
   const[editingContrato,setEditingContrato]=useState(null);
-  const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+  const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[buscaContrato,setBuscaContrato]=useState('');
+  const[buscaVisita,setBuscaVisita]=useState('');
   const[showGerador,setShowGerador]=useState(false);
   const[dadosContrato,setDadosContrato]=useState({
     tipoImovel:'',genero:'feminino',nome:'',nacionalidade:'brasileira',profissao:'',portadorGenero:'portadora',
@@ -416,6 +419,34 @@ function G4Investimoveis(){
   const hojeStr=`${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
   const getDiasDoMes=(m,a)=>{const p=new Date(a,m,1);const ds=p.getDay();const td=new Date(a,m+1,0).getDate();const d=[];for(let i=0;i<ds;i++)d.push(null);for(let i=1;i<=td;i++)d.push(i);return d;};
   const getTarefasDoDia=(dia)=>{if(!dia)return[];const ds=`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;return tarefas.filter(t=>t.data===ds);};
+  const dsFromDate=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const getDiasDaSemana=(offset)=>{const base=new Date(hoje);base.setDate(base.getDate()+offset*7);const dow=base.getDay();const dom=new Date(base);dom.setDate(base.getDate()-dow);return Array.from({length:7},(_,i)=>{const d=new Date(dom);d.setDate(dom.getDate()+i);return d;});};
+  const diasComTarefasNoMes=useMemo(()=>{const total=new Date(anoAtual,mesAtual+1,0).getDate();const arr=[];for(let d=1;d<=total;d++){const ds=`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;if(tarefas.some(t=>t.data===ds))arr.push({dia:d,ds});}return arr;},[tarefas,mesAtual,anoAtual]);
+  const renderTarefasCard=(ds,label)=>{
+    const tD=tarefas.filter(t=>t.data===ds).sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+    const isH=ds===hojeStr;
+    return(<div key={ds} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200 ${isH?'bg-orange-50':'bg-gray-50'}`}>
+        <h4 className={`font-semibold text-sm ${isH?'text-orange-700':'text-gray-700'}`}>{label}{isH&&<span className="ml-2 text-[10px] font-bold text-orange-500 align-middle">HOJE</span>}</h4>
+        <button onClick={()=>abrirNovaTarefa(parseInt(ds.split('-')[2]))} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Icons.Plus/></button>
+      </div>
+      <div className="p-3 space-y-2">
+        {tD.length>0?tD.map(t=>(<div key={t.id} className={`p-3 rounded-lg border ${t.concluida?'bg-gray-50 border-gray-200':t.data<hojeStr?'bg-red-50 border-red-200':'bg-white border-gray-200'}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <button onClick={()=>toggleConcluida(t.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${t.concluida?'bg-green-500 border-green-500 text-white':'border-gray-300 hover:border-green-500'}`}>{t.concluida&&<Icons.Check/>}</button>
+                <span className={`font-medium text-sm break-words ${t.concluida?'line-through text-gray-400':'text-gray-800'}`}>{t.titulo}</span>
+              </div>
+              {t.descricao&&<p className="text-xs text-gray-500 mt-1 ml-7 break-words">{t.descricao}</p>}
+              <div className="flex items-center gap-2 mt-1.5 ml-7">{t.hora&&<span className="text-xs text-gray-400 flex items-center gap-1"><Icons.Clock/>{t.hora}</span>}<span className={`text-xs px-2 py-0.5 rounded-full text-white ${getPC(t.prioridade)}`}>{getPL(t.prioridade)}</span></div>
+            </div>
+            <div className="flex gap-1 flex-shrink-0"><button onClick={()=>editarTarefa(t)} className="p-1 text-gray-400 hover:text-blue-500"><Icons.Edit2/></button><button onClick={()=>deletarTarefa(t.id)} className="p-1 text-gray-400 hover:text-red-500"><Icons.Trash2/></button></div>
+          </div>
+        </div>)):<p className="text-gray-400 text-sm text-center py-3">Nenhuma tarefa</p>}
+      </div>
+    </div>);
+  };
   const tarefasAtrasadas=useMemo(()=>tarefas.filter(t=>!t.concluida&&t.data<hojeStr),[tarefas,hojeStr]);
   const tarefasHoje=useMemo(()=>tarefas.filter(t=>!t.concluida&&t.data===hojeStr),[tarefas,hojeStr]);
   const tarefasPendentes=useMemo(()=>tarefas.filter(t=>!t.concluida).length,[tarefas]);
@@ -460,7 +491,7 @@ function G4Investimoveis(){
     if(!novoContrato.cliente)return;
     const item=editingContrato?{...novoContrato,id:editingContrato.id}:{...novoContrato,id:Date.now(),checklist:[false,false,false,false,false,false,false,false,false]};
     await fsAdd('contratos',item);
-    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});
+    setShowContratoModal(false);setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});
   };
 
   const handleImageUpload=async(contrato,file)=>{
@@ -482,6 +513,63 @@ function G4Investimoveis(){
     const completos=cl.filter(Boolean).length;
     return{completos,total,isCompleto:completos===total};
   };
+
+  // VISITAS A IMÓVEIS
+  const TIPOS_IMOVEL=['Lote','Casa','Apartamento','Comercial','Outro'];
+  const diasDesdeVisita=(c)=>{
+    const base=c.ultimaVisita||c.dataInicio;
+    if(!base)return Infinity;
+    const v=new Date(base+'T00:00:00');const hj=new Date();hj.setHours(0,0,0,0);
+    return Math.floor((hj-v)/(1000*60*60*24));
+  };
+  const marcarVisita=async(c)=>{
+    const hj=new Date();const hjStr=`${hj.getFullYear()}-${String(hj.getMonth()+1).padStart(2,'0')}-${String(hj.getDate()).padStart(2,'0')}`;
+    const horaStr=`${String(hj.getHours()).padStart(2,'0')}:${String(hj.getMinutes()).padStart(2,'0')}`;
+    await fsAdd('contratos',{...c,ultimaVisita:hjStr,ultimaVisitaHora:horaStr});
+  };
+  const toggleManutencao=async(c)=>{
+    await fsAdd('contratos',{...c,precisaManutencao:!c.precisaManutencao});
+  };
+  const ordenarPorPrioridadeVisita=(a,b)=>{
+    const manutA=a.precisaManutencao?0:1;const manutB=b.precisaManutencao?0:1;
+    if(manutA!==manutB)return manutA-manutB;
+    return diasDesdeVisita(b)-diasDesdeVisita(a);
+  };
+  const imoveisParaVisitar=useMemo(()=>contratos
+    .filter(c=>c.status==='ativo'&&getChecklistProgress(c).isCompleto)
+    .sort(ordenarPorPrioridadeVisita),[contratos]);
+  const imoveisAtrasadosVisita=useMemo(()=>imoveisParaVisitar
+    .filter(c=>diasDesdeVisita(c)>=30),[imoveisParaVisitar]);
+  const imoveisVisitaFiltrados=useMemo(()=>{
+    if(!buscaVisita)return imoveisParaVisitar;
+    const b=buscaVisita.toLowerCase();
+    return imoveisParaVisitar.filter(c=>{
+      const nome=(c.cliente||'').toLowerCase();
+      const endereco=(c.endereco||c.imovel||'').toLowerCase();
+      return nome.includes(b)||endereco.includes(b);
+    });
+  },[imoveisParaVisitar,buscaVisita]);
+
+  // Lembrete automático e único: aparece no dia seguinte quando algum imóvel fica atrasado para visita
+  useEffect(()=>{
+    const REMINDER_ID='auto-visita-imoveis';
+    const existente=tarefas.find(t=>String(t.id)===REMINDER_ID);
+    if(imoveisAtrasadosVisita.length===0){
+      if(existente)fsDel('tarefas',existente._docId||REMINDER_ID);
+      return;
+    }
+    const precisaCriar=!existente||(existente.concluida&&existente.data<hojeStr);
+    if(precisaCriar){
+      const amanha=new Date();amanha.setDate(amanha.getDate()+1);
+      const amanhaStr=`${amanha.getFullYear()}-${String(amanha.getMonth()+1).padStart(2,'0')}-${String(amanha.getDate()).padStart(2,'0')}`;
+      fsAdd('tarefas',{
+        id:REMINDER_ID,
+        titulo:`📍 ${imoveisAtrasadosVisita.length} imóvel(is) atrasado(s) para visita`,
+        descricao:'Confira a aba Visitas.',
+        data:amanhaStr,hora:'',prioridade:'alta',concluida:false
+      });
+    }
+  },[imoveisAtrasadosVisita]);
 
   const toggleChecklistItem=async(contrato,index)=>{
     const cl=[...(contrato.checklist||[false,false,false,false,false,false,false,false,false])];
@@ -513,6 +601,54 @@ function G4Investimoveis(){
   const labelCls="block text-gray-600 text-sm mb-1.5";
   const btnGrad="px-5 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-semibold hover:from-red-500 hover:to-orange-400 transition-all shadow-lg";
 
+  const NAV_TABS=[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0},{k:'visitas',l:'Visitas',I:Icons.MapPin,b:imoveisAtrasadosVisita.length}];
+
+  const renderNotifBell=(dark)=>(
+    <div className="relative">
+      <button onClick={async()=>{
+        if(!showNotificacoes){
+          setNotifsVistas(totalNotifs);
+          try{await db.collection('_config').doc('notifsVistas').set({count:totalNotifs});}catch(e){console.error('Erro salvar notifs:',e);}
+        }
+        setShowNotificacoes(!showNotificacoes);
+      }} className={`relative p-2.5 transition-colors ${dark?'text-gray-400 hover:text-white':'text-gray-500 hover:text-gray-800'}`}>
+        <Icons.Bell/>
+        {totalNotifs>0&&totalNotifs!==notifsVistas&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
+      </button>
+      {showNotificacoes&&(
+        <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] max-w-sm sm:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
+          <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Notificações</h3></div>
+          <div className="max-h-80 overflow-y-auto">
+            {contratosVencidos.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
+              <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Contratos Vencidos ({contratosVencidos.length})</div>
+              {contratosVencidos.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-red-700">{c.cliente}</p><p className="text-xs text-red-500">{c.imovel} - Venceu {fmtData(c.dataVencimento)}</p></div>)}
+            </div>}
+            {contratosVencendo.length>0&&<div className="p-3 bg-amber-50 border-b border-amber-100">
+              <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm mb-2"><Icons.Clock/>Contratos Vencendo ({contratosVencendo.length})</div>
+              {contratosVencendo.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-amber-700">{c.cliente}</p><p className="text-xs text-amber-500">{c.imovel} - {diasRestantes(c.dataVencimento)} dias restantes</p></div>)}
+            </div>}
+            {tarefasAtrasadas.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
+              <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Tarefas Atrasadas ({tarefasAtrasadas.length})</div>
+              {tarefasAtrasadas.map(t=><div key={t.id} className="flex items-center justify-between py-1.5"><div><p className="text-sm font-medium text-red-700">{t.titulo}</p><p className="text-xs text-red-500">{fmtData(t.data)}</p></div><button onClick={()=>toggleConcluida(t.id)} className="p-1 text-red-400 hover:text-green-500"><Icons.Check/></button></div>)}
+            </div>}
+            {totalNotifs===0&&<div className="p-6 text-center text-gray-400"><p className="text-sm">Tudo em dia! ✓</p></div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const acaoBtnHeader=(<>
+    {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
+    {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
+    {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
+    {abaAtiva==='emAndamento'&&(
+      <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
+        <Icons.Plus/>Adicionar Contrato
+      </button>
+    )}
+  </>);
+
   if(loading) return(
     <div className="min-h-screen bg-gray-800 flex flex-col items-center justify-center">
       <img src={LOGO_SRC} alt="G4" className="h-20 w-auto rounded mb-6"/>
@@ -531,68 +667,25 @@ function G4Investimoveis(){
     {/* HEADER */}
     <header className="bg-gray-800 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src={LOGO_SRC} alt="G4" className="h-14 w-auto rounded"/>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <img src={LOGO_SRC} alt="G4" className="h-10 sm:h-14 w-auto rounded"/>
             <div>
-              <h1 className="text-2xl font-bold"><span className="text-red-500">G4</span> <span className="text-orange-400">INVESTIMÓVEIS</span></h1>
-              <p className="text-gray-400 text-sm">Sistema de Gestão</p>
+              <h1 className="text-lg sm:text-2xl font-bold"><span className="text-red-500">G4</span> <span className="text-orange-400">INVESTIMÓVEIS</span></h1>
+              <p className="text-gray-400 text-xs sm:text-sm">Sistema de Gestão</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <button onClick={async()=>{
-                if(!showNotificacoes){
-                  setNotifsVistas(totalNotifs);
-                  try{await db.collection('_config').doc('notifsVistas').set({count:totalNotifs});}catch(e){console.error('Erro salvar notifs:',e);}
-                }
-                setShowNotificacoes(!showNotificacoes);
-              }} className="relative p-2.5 text-gray-400 hover:text-white transition-colors">
-                <Icons.Bell/>
-                {totalNotifs>0&&totalNotifs!==notifsVistas&&<span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{totalNotifs}</span>}
-              </button>
-              {showNotificacoes&&(
-                <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 notif-slide">
-                  <div className="p-4 border-b border-gray-200"><h3 className="font-bold text-gray-800">Notificações</h3></div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {contratosVencidos.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
-                      <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Contratos Vencidos ({contratosVencidos.length})</div>
-                      {contratosVencidos.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-red-700">{c.cliente}</p><p className="text-xs text-red-500">{c.imovel} - Venceu {fmtData(c.dataVencimento)}</p></div>)}
-                    </div>}
-                    {contratosVencendo.length>0&&<div className="p-3 bg-amber-50 border-b border-amber-100">
-                      <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm mb-2"><Icons.Clock/>Contratos Vencendo ({contratosVencendo.length})</div>
-                      {contratosVencendo.map(c=><div key={c.id} className="py-1.5"><p className="text-sm font-medium text-amber-700">{c.cliente}</p><p className="text-xs text-amber-500">{c.imovel} - {diasRestantes(c.dataVencimento)} dias restantes</p></div>)}
-                    </div>}
-                    {tarefasAtrasadas.length>0&&<div className="p-3 bg-red-50 border-b border-red-100">
-                      <div className="flex items-center gap-2 text-red-600 font-semibold text-sm mb-2"><Icons.AlertTriangle/>Tarefas Atrasadas ({tarefasAtrasadas.length})</div>
-                      {tarefasAtrasadas.map(t=><div key={t.id} className="flex items-center justify-between py-1.5"><div><p className="text-sm font-medium text-red-700">{t.titulo}</p><p className="text-xs text-red-500">{fmtData(t.data)}</p></div><button onClick={()=>toggleConcluida(t.id)} className="p-1 text-red-400 hover:text-green-500"><Icons.Check/></button></div>)}
-                    </div>}
-                    {totalNotifs===0&&<div className="p-6 text-center text-gray-400"><p className="text-sm">Tudo em dia! ✓</p></div>}
-                  </div>
-                </div>
-              )}
-            </div>
-            {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
-            {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-            {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
-            {abaAtiva==='emAndamento'&&(
-              <div className="flex gap-2">
-                <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
-                  <Icons.Plus/>Adicionar Contrato
-                </button>
-                <button onClick={()=>setShowGerador(true)} className={`flex items-center gap-2 ${btnGrad}`}>
-                  <Icons.Plus/>Gerar Novo Contrato
-                </button>
-              </div>
-            )}
+          <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+            {renderNotifBell(true)}
+            {acaoBtnHeader}
           </div>
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex gap-0">
-          {[{k:'home',l:'Home',I:Icons.CalendarIcon,b:tarefasAtrasadas.length},{k:'clientes',l:'Clientes',I:Icons.Users,b:0},{k:'contratos',l:'Contratos',I:Icons.FileText,b:contratosVencidos.length+contratosVencendo.length},{k:'emAndamento',l:'Em Andamento',I:Icons.Clock,b:0}].map(t=>(
+        <div className="flex gap-0 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
+          {NAV_TABS.map(t=>(
             <button key={t.k} onClick={()=>setAbaAtiva(t.k)}
-              className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
+              className={`flex items-center gap-2 shrink-0 px-3 sm:px-6 py-3 font-semibold text-sm transition-all border-b-2 ${abaAtiva===t.k?'text-orange-400 border-orange-400':'text-gray-400 border-transparent hover:text-gray-200'}`}>
               <t.I/>{t.l}
               {t.b>0&&<span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">{t.b}</span>}
             </button>
@@ -605,23 +698,55 @@ function G4Investimoveis(){
     {abaAtiva==='home'&&(
       <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
         {tarefasAtrasadas.length>0&&<div className="bg-red-500 text-white py-2.5 px-4 rounded-xl mb-4"><div className="flex items-center gap-2 text-sm"><Icons.AlertTriangle/><span className="font-semibold">Atenção!</span> {tarefasAtrasadas.length} tarefa(s) atrasada(s)</div></div>}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-4">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between p-5 bg-gray-800">
-                <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
-                <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
-                <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
+                {visaoCalendario!=='semana'?(<>
+                  <button onClick={mesAnterior} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronLeft/></button>
+                  <h2 className="text-xl md:text-2xl font-bold text-white">{MESES[mesAtual]} {anoAtual}</h2>
+                  <button onClick={mesSeguinte} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg"><Icons.ChevronRight/></button>
+                </>):(
+                  <h2 className="text-xl md:text-2xl font-bold text-white mx-auto">Agenda Semanal</h2>
+                )}
               </div>
-              <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-4 text-center text-sm md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
-              <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
-                const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
-                const isH=ds===hojeStr;const isS=diaSelecionado===ds;
-                return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[120px] md:min-h-[140px] p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
-                  {dia&&<><div className="flex items-center justify-between"><span className={`text-base md:text-lg font-semibold w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
-                  <div className="mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-sm px-1.5 py-1 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-sm text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div></>}
-                </div>);
-              })}</div>
+              <div className="flex items-center gap-1 px-3 py-2 bg-gray-800 border-t border-gray-700">
+                {[{k:'grade',l:'Grade'},{k:'lista',l:'Lista'},{k:'semana',l:'Semana'}].map(v=>(
+                  <button key={v.k} onClick={()=>{setVisaoCalendario(v.k);if(v.k==='semana')setSemanaOffset(0);}} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${visaoCalendario===v.k?'bg-orange-500 text-white':'text-gray-300 hover:bg-gray-700'}`}>{v.l}</button>
+                ))}
+              </div>
+
+              {visaoCalendario==='grade'&&(<>
+                <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">{DIAS_SEMANA.map(d=><div key={d} className="py-2 md:py-4 text-center text-xs md:text-base font-semibold text-gray-600 uppercase">{d}</div>)}</div>
+                <div className="grid grid-cols-7">{getDiasDoMes(mesAtual,anoAtual).map((dia,i)=>{
+                  const tD=getTarefasDoDia(dia);const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';
+                  const isH=ds===hojeStr;const isS=diaSelecionado===ds;
+                  return(<div key={i} onClick={()=>dia&&setDiaSelecionado(ds)} className={`min-h-[56px] md:min-h-[150px] p-1 md:p-2 border-b border-r border-gray-100 cursor-pointer transition-colors ${!dia?'bg-gray-50':'hover:bg-blue-50'} ${isH?'bg-orange-50':''} ${isS?'bg-blue-100 ring-2 ring-blue-400 ring-inset':''}`}>
+                    {dia&&<>
+                      <div className="flex items-center justify-center md:justify-between"><span className={`text-xs md:text-lg font-semibold w-6 h-6 md:w-9 md:h-9 flex items-center justify-center rounded-full ${isH?'bg-orange-500 text-white':'text-gray-800'}`}>{dia}</span></div>
+                      {tD.length>0&&<div className="md:hidden flex flex-wrap justify-center gap-0.5 mt-1">{tD.slice(0,5).map(t=><span key={t.id} className={`w-1.5 h-1.5 rounded-full ${t.concluida?'bg-gray-300':t.data<hojeStr?'bg-red-500':getPC(t.prioridade)}`}></span>)}{tD.length>5&&<span className="text-[9px] text-gray-400 leading-none">+{tD.length-5}</span>}</div>}
+                      <div className="hidden md:block mt-1 space-y-1">{tD.slice(0,3).map(t=><div key={t.id} onClick={e=>{e.stopPropagation();editarTarefa(t);}} className={`text-xs px-1.5 py-0.5 rounded cursor-pointer font-medium leading-tight break-words ${t.concluida?'bg-gray-100 text-gray-400 line-through':t.data<hojeStr?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}`}><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 flex-shrink-0 ${getPC(t.prioridade)}`}></span>{t.titulo}</div>)}{tD.length>3&&<span className="text-xs text-gray-500 pl-1 font-medium">+{tD.length-3}</span>}</div>
+                    </>}
+                  </div>);
+                })}</div>
+              </>)}
+
+              {visaoCalendario==='lista'&&(
+                <div className="p-3 sm:p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                  {diasComTarefasNoMes.length>0?diasComTarefasNoMes.map(({dia,ds})=>renderTarefasCard(ds,`${DIAS_SEMANA[new Date(anoAtual,mesAtual,dia).getDay()]} ${String(dia).padStart(2,'0')}/${String(mesAtual+1).padStart(2,'0')}`)):<p className="text-gray-400 text-sm text-center py-10">Nenhuma tarefa em {MESES[mesAtual]}</p>}
+                </div>
+              )}
+
+              {visaoCalendario==='semana'&&(<>
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  <button onClick={()=>setSemanaOffset(semanaOffset-1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-lg"><Icons.ChevronLeft/></button>
+                  <button onClick={()=>setSemanaOffset(0)} className="text-xs font-semibold text-gray-500 hover:text-gray-800">{semanaOffset===0?'Semana atual':'Voltar para hoje'}</button>
+                  <button onClick={()=>setSemanaOffset(semanaOffset+1)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-lg"><Icons.ChevronRight/></button>
+                </div>
+                <div className="p-3 sm:p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                  {getDiasDaSemana(semanaOffset).map(d=>renderTarefasCard(dsFromDate(d),`${DIAS_SEMANA[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`))}
+                </div>
+              </>)}
             </div>
           </div>
           <div className="space-y-4">
@@ -726,6 +851,7 @@ function G4Investimoveis(){
         <div className="grid gap-4">
           {contratos
             .filter(c=>{
+              if((c._docId||'').startsWith('site-'))return false; // Anúncio do site público, não é contrato interno
               const prog=getChecklistProgress(c);
               return !prog.isCompleto; // Apenas contratos incompletos (0-8/9)
             })
@@ -925,6 +1051,7 @@ function G4Investimoveis(){
                           <h3 className="text-lg font-semibold">{c.cliente}</h3>
                           <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
                           <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
+                          {c.tipoImovel&&<span className={`px-3 py-1 text-xs font-bold rounded-full ${c.tipoImovel==='Lote'?'bg-purple-100 text-purple-700 border border-purple-300':'bg-white/50 border'}`}>{c.tipoImovel}</span>}
                           <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
                             {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
                           </span>
@@ -960,6 +1087,77 @@ function G4Investimoveis(){
           })}
         </div>
         {contratos.length===0&&<div className="text-center py-16"><p className="text-gray-400">Nenhum contrato cadastrado</p></div>}
+      </main>
+    )}
+
+    {/* ====== ABA VISITAS ====== */}
+    {abaAtiva==='visitas'&&(
+      <main className="max-w-7xl mx-auto px-4 py-6 fade-in">
+        <h2 className="text-2xl font-bold text-gray-800 mb-1 flex items-center gap-2"><Icons.MapPin/>Visitas aos Imóveis</h2>
+        <p className="text-sm text-gray-500 mb-6">Ordenado por prioridade: quem precisa de manutenção primeiro, depois quem está mais perto de completar 30 dias sem visita.</p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <p className="text-gray-500 text-sm">Imóveis ativos</p>
+            <p className="text-2xl font-bold text-gray-800">{imoveisParaVisitar.length}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <p className="text-gray-500 text-sm">Atrasados (30+ dias)</p>
+            <p className="text-2xl font-bold text-purple-600">{imoveisAtrasadosVisita.length}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+            <p className="text-gray-500 text-sm">Em dia</p>
+            <p className="text-2xl font-bold text-green-600">{imoveisParaVisitar.length-imoveisAtrasadosVisita.length}</p>
+          </div>
+        </div>
+
+        {/* Barra de Pesquisa */}
+        <div className="mb-6">
+          <div className="relative">
+            <Icons.Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"/>
+            <input
+              type="text"
+              placeholder="Buscar por nome ou endereço..."
+              value={buscaVisita}
+              onChange={(e)=>setBuscaVisita(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 focus:outline-none transition-colors"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          {imoveisVisitaFiltrados.length>0?imoveisVisitaFiltrados.map(c=>{
+            const dv=diasDesdeVisita(c);
+            const atrasado=dv>=30;
+            const visitado=!atrasado&&!!c.ultimaVisita;
+            const cor=atrasado?'red':visitado?'gray':'green';
+            const estilos={
+              red:{card:'border-red-200',badge:'bg-red-100 text-red-700 border border-red-300',status:'text-red-600',btn:'bg-red-600 hover:bg-red-700 border-red-100'},
+              green:{card:'border-green-200',badge:'bg-green-100 text-green-700 border border-green-300',status:'text-green-600',btn:'bg-green-600 hover:bg-green-700 border-green-100'},
+              gray:{card:'border-gray-200 opacity-75',badge:'bg-gray-100 text-gray-500 border border-gray-300',status:'text-gray-400',btn:'bg-gray-400 hover:bg-gray-500 border-gray-100'},
+            }[cor];
+            return(<div key={c.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${estilos.card} ${c.precisaManutencao?'ring-2 ring-red-400':''}`}>
+              <div className="p-4">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                  {c.tipoImovel&&<span className={`px-2.5 py-1 text-xs font-bold rounded-full ${c.tipoImovel==='Lote'?'bg-purple-100 text-purple-700 border border-purple-300':'bg-gray-100 text-gray-600 border border-gray-300'}`}>{c.tipoImovel}</span>}
+                  <span className="font-semibold text-gray-800">{c.cliente}</span>
+                  <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${estilos.badge}`}>{atrasado?'Atrasado':visitado?'Em dia':'Precisa visitar'}</span>
+                  {c.precisaManutencao&&<span className="px-2.5 py-1 text-xs font-bold rounded-full bg-red-600 text-white flex items-center gap-1">⚠ Precisa manutenção</span>}
+                </div>
+                <div className="flex items-center gap-1.5 text-base text-gray-600 mb-1.5"><Icons.MapPin className="w-5 h-5 shrink-0"/>{c.endereco||c.imovel||'—'}</div>
+                <div className={`text-sm font-semibold ${estilos.status}`}>
+                  {c.ultimaVisita?`${dv===0?'Visitado hoje':`Visitado há ${dv} dias`} (última em ${fmtData(c.ultimaVisita)}${c.ultimaVisitaHora?` às ${c.ultimaVisitaHora}`:''})`:'Ainda não foi visitado'}
+                </div>
+              </div>
+              <div className="flex border-t">
+                <button onClick={()=>marcarVisita(c)} className={`flex-1 flex items-center justify-center gap-2 py-3 text-white font-semibold transition-colors ${estilos.btn}`}><Icons.Check/>Visitei hoje</button>
+                <button onClick={()=>toggleManutencao(c)} className={`flex-1 flex items-center justify-center gap-2 py-3 font-semibold transition-colors border-l ${c.precisaManutencao?'bg-green-600 hover:bg-green-700 text-white':'bg-white hover:bg-red-50 text-red-600'}`}>
+                  {c.precisaManutencao?<>✓ Marcar como resolvido</>:<>⚠ Reportar problema</>}
+                </button>
+              </div>
+            </div>);
+          }):<div className="text-center py-16"><p className="text-gray-400">{buscaVisita?'Nenhum imóvel encontrado para essa busca.':'Nenhum imóvel ativo para visitar ainda.'}</p></div>}
+        </div>
       </main>
     )}
 
@@ -1017,12 +1215,12 @@ function G4Investimoveis(){
                     </h4>
                     <div className="space-y-3">
                       <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome} onChange={e=>setDadosContrato({...dadosContrato,nome:e.target.value})} placeholder="Ex: João da Silva" className={inputCls}/></div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade:e.target.value})} placeholder="brasileiro" className={inputCls}/></div>
                         <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: engenheiro" className={inputCls}/></div>
                       </div>
                       <div className="text-xs text-gray-500 italic">Estado Civil: casado | Gênero: portador</div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg} onChange={e=>setDadosContrato({...dadosContrato,rg:e.target.value})} placeholder="Ex: 12.345.678-9" className={inputCls}/></div>
                         <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpf} onChange={e=>setDadosContrato({...dadosContrato,cpf:e.target.value})} placeholder="Ex: 123.456.789-00" className={inputCls}/></div>
                       </div>
@@ -1037,12 +1235,12 @@ function G4Investimoveis(){
                     </h4>
                     <div className="space-y-3">
                       <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome2} onChange={e=>setDadosContrato({...dadosContrato,nome2:e.target.value})} placeholder="Ex: Maria da Silva" className={inputCls}/></div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade2} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade2:e.target.value})} placeholder="brasileira" className={inputCls}/></div>
                         <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao2} onChange={e=>setDadosContrato({...dadosContrato,profissao2:e.target.value})} placeholder="Ex: professora" className={inputCls}/></div>
                       </div>
                       <div className="text-xs text-gray-500 italic">Estado Civil: casada | Gênero: portadora</div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>RG</label><input type="text" value={dadosContrato.rg2} onChange={e=>setDadosContrato({...dadosContrato,rg2:e.target.value})} placeholder="Ex: 98.765.432-1" className={inputCls}/></div>
                         <div><label className={labelCls}>CPF</label><input type="text" value={dadosContrato.cpf2} onChange={e=>setDadosContrato({...dadosContrato,cpf2:e.target.value})} placeholder="Ex: 987.654.321-00" className={inputCls}/></div>
                       </div>
@@ -1057,11 +1255,11 @@ function G4Investimoveis(){
                     </h4>
                     <div className="space-y-3">
                       <div><label className={labelCls}>Endereço Completo</label><input type="text" value={dadosContrato.endereco} onChange={e=>setDadosContrato({...dadosContrato,endereco:e.target.value})} placeholder="Ex: Rua Piraí, nº 60, centro" className={inputCls}/></div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Cidade/UF</label><input type="text" value={dadosContrato.cidade} onChange={e=>setDadosContrato({...dadosContrato,cidade:e.target.value})} placeholder="Ex: Mamborê/PR" className={inputCls}/></div>
                         <div><label className={labelCls}>CEP</label><input type="text" value={dadosContrato.cep} onChange={e=>setDadosContrato({...dadosContrato,cep:e.target.value})} placeholder="87340-000" className={inputCls}/></div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><label className={labelCls}>Telefone</label><input type="text" value={dadosContrato.telefone} onChange={e=>setDadosContrato({...dadosContrato,telefone:e.target.value})} placeholder="(44) 99999-9999" className={inputCls}/></div>
                         <div><label className={labelCls}>E-mail</label><input type="text" value={dadosContrato.email} onChange={e=>setDadosContrato({...dadosContrato,email:e.target.value})} placeholder="email@exemplo.com" className={inputCls}/></div>
                       </div>
@@ -1074,11 +1272,11 @@ function G4Investimoveis(){
               {dadosContrato.genero!=='plural'&&(
                 <>
               <div><label className={labelCls}>Nome Completo</label><input type="text" value={dadosContrato.nome} onChange={e=>setDadosContrato({...dadosContrato,nome:e.target.value})} placeholder="Ex: Maria Domingues dos Santos" className={inputCls}/></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidade} onChange={e=>setDadosContrato({...dadosContrato,nacionalidade:e.target.value})} className={inputCls}/></div>
                 <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissao} onChange={e=>setDadosContrato({...dadosContrato,profissao:e.target.value})} placeholder="Ex: aposentada" className={inputCls}/></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><label className={labelCls}>Portador(a)</label><select value={dadosContrato.portadorGenero} onChange={e=>setDadosContrato({...dadosContrato,portadorGenero:e.target.value})} className={inputCls}>
                   <option value="portador">portador</option><option value="portadora">portadora</option>
                 </select></div>
@@ -1087,7 +1285,7 @@ function G4Investimoveis(){
                   {['SSP','SESP','IFP','PC','DETRAN','PM','CBM','CREA','CRM','OAB','Outro'].map(o=><option key={o} value={o}>{o}</option>)}
                 </select></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>UF do RG</label><select value={dadosContrato.rgUF} onChange={e=>setDadosContrato({...dadosContrato,rgUF:e.target.value})} className={inputCls}>
                   {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map(u=><option key={u} value={u}>{u}</option>)}
                 </select></div>
@@ -1105,11 +1303,11 @@ function G4Investimoveis(){
                   </select></div>
                   <div><label className={labelCls}>Data do Casamento</label><input type="text" value={dadosContrato.dataCasamento} onChange={e=>setDadosContrato({...dadosContrato,dataCasamento:e.target.value})} placeholder="Ex: 15/01/2015" className={inputCls}/></div>
                   <div><label className={labelCls}>Nome Completo do Cônjuge</label><input type="text" value={dadosContrato.nomeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nomeConjuge:e.target.value})} placeholder="Ex: Lucas de Souza Vieira" className={inputCls}/></div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label className={labelCls}>Nacionalidade</label><input type="text" value={dadosContrato.nacionalidadeConjuge} onChange={e=>setDadosContrato({...dadosContrato,nacionalidadeConjuge:e.target.value})} className={inputCls}/></div>
                     <div><label className={labelCls}>Profissão</label><input type="text" value={dadosContrato.profissaoConjuge} onChange={e=>setDadosContrato({...dadosContrato,profissaoConjuge:e.target.value})} placeholder="Ex: Autonomo" className={inputCls}/></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div><label className={labelCls}>Portador(a)</label><select value={dadosContrato.portadorGeneroConjuge} onChange={e=>setDadosContrato({...dadosContrato,portadorGeneroConjuge:e.target.value})} className={inputCls}>
                       <option value="portador">portador</option><option value="portadora">portadora</option>
                     </select></div>
@@ -1118,7 +1316,7 @@ function G4Investimoveis(){
                       {['SSP','SESP','IFP','PC','DETRAN','PM','CBM','CREA','CRM','OAB','Outro'].map(o=><option key={o} value={o}>{o}</option>)}
                     </select></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div><label className={labelCls}>UF do RG</label><select value={dadosContrato.rgUFConjuge} onChange={e=>setDadosContrato({...dadosContrato,rgUFConjuge:e.target.value})} className={inputCls}>
                       {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map(u=><option key={u} value={u}>{u}</option>)}
                     </select></div>
@@ -1127,11 +1325,11 @@ function G4Investimoveis(){
                 </div>
               )}
               <div><label className={labelCls}>Endereço</label><input type="text" value={dadosContrato.endereco} onChange={e=>setDadosContrato({...dadosContrato,endereco:e.target.value})} placeholder="Rua, nº, bairro" className={inputCls}/></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>Cidade/UF</label><input type="text" value={dadosContrato.cidade} onChange={e=>setDadosContrato({...dadosContrato,cidade:e.target.value})} className={inputCls}/></div>
                 <div><label className={labelCls}>CEP</label><input type="text" value={dadosContrato.cep} onChange={e=>setDadosContrato({...dadosContrato,cep:e.target.value})} className={inputCls}/></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={labelCls}>Telefone</label><input type="text" value={dadosContrato.telefone} onChange={e=>setDadosContrato({...dadosContrato,telefone:e.target.value})} placeholder="(44) 99999-9999" className={inputCls}/></div>
                 <div><label className={labelCls}>E-mail</label><input type="text" value={dadosContrato.email} onChange={e=>setDadosContrato({...dadosContrato,email:e.target.value})} placeholder="ou: declara não possuir" className={inputCls}/></div>
               </div>
@@ -1145,18 +1343,18 @@ function G4Investimoveis(){
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Icons.Building2/>Dados do Imóvel</h3>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Data de Terras nº</label><input type="text" value={dadosContrato.dataTerraN} onChange={e=>setDadosContrato({...dadosContrato,dataTerraN:e.target.value})} placeholder="Ex: 08" className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.dataTerraNExtenso} onChange={e=>setDadosContrato({...dadosContrato,dataTerraNExtenso:e.target.value})} placeholder="Ex: oito" className={inputCls}/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Quadra nº</label><input type="text" value={dadosContrato.quadraN} onChange={e=>setDadosContrato({...dadosContrato,quadraN:e.target.value})} placeholder="Ex: 111" className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.quadraNExtenso} onChange={e=>setDadosContrato({...dadosContrato,quadraNExtenso:e.target.value})} placeholder="Ex: cento e onze" className={inputCls}/></div>
                 </div>
                 <div><label className={labelCls}>Área (m²)</label><input type="text" value={dadosContrato.areaM2} onChange={e=>setDadosContrato({...dadosContrato,areaM2:e.target.value})} placeholder="Ex: 750,00" className={inputCls}/></div>
                 <div><label className={labelCls}>Endereço do Imóvel</label><input type="text" value={dadosContrato.enderecoImovel} onChange={e=>setDadosContrato({...dadosContrato,enderecoImovel:e.target.value})} placeholder="Av. Archiles Martins, nº 608" className={inputCls}/></div>
                 <div><label className={labelCls}>Cidade/UF do Imóvel</label><input type="text" value={dadosContrato.cidadeImovel} onChange={e=>setDadosContrato({...dadosContrato,cidadeImovel:e.target.value})} className={inputCls}/></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Matrícula nº</label><input type="text" value={dadosContrato.matricula} onChange={e=>setDadosContrato({...dadosContrato,matricula:e.target.value})} className={inputCls}/></div>
                   <div><label className={labelCls}>Livro nº</label><input type="text" value={dadosContrato.livro} onChange={e=>setDadosContrato({...dadosContrato,livro:e.target.value})} className={inputCls}/></div>
                 </div>
@@ -1165,21 +1363,21 @@ function G4Investimoveis(){
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Icons.DollarSign/>Condições</h3>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Valor (R$)</label><input type="text" value={dadosContrato.valorVenda} onChange={e=>setDadosContrato({...dadosContrato,valorVenda:e.target.value})} placeholder="165.000,00" className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.valorVendaExtenso} onChange={e=>setDadosContrato({...dadosContrato,valorVendaExtenso:e.target.value})} placeholder="cento e sessenta e cinco mil reais" className={inputCls}/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Vigência (meses)</label><input type="text" value={dadosContrato.vigenciaMeses} onChange={e=>setDadosContrato({...dadosContrato,vigenciaMeses:e.target.value})} className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.vigenciaMesesExtenso} onChange={e=>setDadosContrato({...dadosContrato,vigenciaMesesExtenso:e.target.value})} className={inputCls}/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Comissão (%)</label><input type="text" value={dadosContrato.comissaoPercent} onChange={e=>setDadosContrato({...dadosContrato,comissaoPercent:e.target.value})} className={inputCls}/></div>
                   <div><label className={labelCls}>Por extenso</label><input type="text" value={dadosContrato.comissaoPercentExtenso} onChange={e=>setDadosContrato({...dadosContrato,comissaoPercentExtenso:e.target.value})} className={inputCls}/></div>
                 </div>
                 <h4 className="font-semibold text-gray-700 mt-4 pt-3 border-t border-gray-200">Testemunha e Data</h4>
                 <div><label className={labelCls}>Data do Contrato</label><input type="text" value={dadosContrato.dataContrato} onChange={e=>setDadosContrato({...dadosContrato,dataContrato:e.target.value})} placeholder="Ex: 15 de janeiro de 2026" className={inputCls}/></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={labelCls}>Nome Testemunha</label><input type="text" value={dadosContrato.testemunhaNome} onChange={e=>setDadosContrato({...dadosContrato,testemunhaNome:e.target.value})} placeholder="Nome da testemunha" className={inputCls}/></div>
                   <div><label className={labelCls}>CPF Testemunha</label><input type="text" value={dadosContrato.testemunhaCPF} onChange={e=>setDadosContrato({...dadosContrato,testemunhaCPF:e.target.value})} placeholder="000.000.000-00" className={inputCls}/></div>
                 </div>
@@ -1243,9 +1441,9 @@ function G4Investimoveis(){
     {showModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingCliente?'Editar Cliente':'Novo Cliente'}</h2><button onClick={()=>setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:mascaraData(e.target.value)})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" inputMode="numeric" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:mascaraTelefone(e.target.value)})} className={inputCls}/></div></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:mascaraData(e.target.value)})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" inputMode="numeric" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:mascaraTelefone(e.target.value)})} className={inputCls}/></div></div>
         <div><label className={labelCls}>Nome</label><input type="text" placeholder="Nome completo" value={novoCliente.nome} onChange={e=>setNovoCliente({...novoCliente,nome:e.target.value})} className={inputCls}/></div>
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Interesse</label><select value={novoCliente.interesse} onChange={e=>setNovoCliente({...novoCliente,interesse:e.target.value})} className={inputCls}><option value="">Selecione</option>{interesses.map(i=><option key={i}>{i}</option>)}</select></div><div><label className={labelCls}>Tipo</label><select value={novoCliente.tipo} onChange={e=>setNovoCliente({...novoCliente,tipo:e.target.value})} className={inputCls}><option value="">Selecione</option>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Interesse</label><select value={novoCliente.interesse} onChange={e=>setNovoCliente({...novoCliente,interesse:e.target.value})} className={inputCls}><option value="">Selecione</option>{interesses.map(i=><option key={i}>{i}</option>)}</select></div><div><label className={labelCls}>Tipo</label><select value={novoCliente.tipo} onChange={e=>setNovoCliente({...novoCliente,tipo:e.target.value})} className={inputCls}><option value="">Selecione</option>{tipos.map(t=><option key={t}>{t}</option>)}</select></div></div>
         <div><label className={labelCls}>Valor</label><input type="text" inputMode="numeric" placeholder="Ex: R$ 250.000,00" value={novoCliente.valor} onChange={e=>setNovoCliente({...novoCliente,valor:mascaraValor(e.target.value)})} className={inputCls}/></div>
         <div><label className={labelCls}>Descrição</label><textarea placeholder="Detalhes..." value={novoCliente.descricao} onChange={e=>setNovoCliente({...novoCliente,descricao:e.target.value})} rows={2} className={inputCls+" resize-none"}/></div>
       </div>
@@ -1256,7 +1454,7 @@ function G4Investimoveis(){
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingTarefa?'Editar Tarefa':'Nova Tarefa'}</h2><button onClick={()=>setShowTarefaModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3">
         <div><label className={labelCls}>Título *</label><input type="text" value={novaTarefa.titulo} onChange={e=>setNovaTarefa({...novaTarefa,titulo:e.target.value})} placeholder="Ex: Visitar imóvel..." className={inputCls}/></div>
-        <div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Data *</label><input type="date" value={novaTarefa.data} onChange={e=>setNovaTarefa({...novaTarefa,data:e.target.value})} className={inputCls}/></div><div><label className={labelCls}>Horário</label><input type="time" value={novaTarefa.hora} onChange={e=>setNovaTarefa({...novaTarefa,hora:e.target.value})} className={inputCls}/></div></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Data *</label><input type="date" value={novaTarefa.data} onChange={e=>setNovaTarefa({...novaTarefa,data:e.target.value})} className={inputCls}/></div><div><label className={labelCls}>Horário</label><input type="time" value={novaTarefa.hora} onChange={e=>setNovaTarefa({...novaTarefa,hora:e.target.value})} className={inputCls}/></div></div>
         <div><label className={labelCls}>Prioridade</label><div className="flex gap-3">{[{v:'baixa',l:'Baixa',c:'border-green-500 bg-green-50 text-green-700'},{v:'media',l:'Média',c:'border-amber-500 bg-amber-50 text-amber-700'},{v:'alta',l:'Alta',c:'border-red-500 bg-red-50 text-red-700'}].map(p=><button key={p.v} onClick={()=>setNovaTarefa({...novaTarefa,prioridade:p.v})} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${novaTarefa.prioridade===p.v?p.c:'border-gray-200 bg-gray-50 text-gray-500'}`}>{p.l}</button>)}</div></div>
         <div><label className={labelCls}>Descrição</label><textarea value={novaTarefa.descricao} onChange={e=>setNovaTarefa({...novaTarefa,descricao:e.target.value})} rows={2} className={inputCls+" resize-none"} placeholder="Detalhes..."/></div>
         {!editingTarefa&&<div className="border-t border-gray-200 pt-3">
@@ -1305,11 +1503,12 @@ function G4Investimoveis(){
         <div><label className={labelCls}>Cliente *</label><input type="text" value={novoContrato.cliente} onChange={e=>setNovoContrato({...novoContrato,cliente:e.target.value})} placeholder="Nome do cliente" className={inputCls}/></div>
         <div><label className={labelCls}>Código de Referência</label><input type="text" value={novoContrato.codigoRef||''} onChange={e=>setNovoContrato({...novoContrato,codigoRef:e.target.value})} placeholder="Ex: CON-001" className={inputCls}/></div>
         <div><label className={labelCls}>Endereço</label><input type="text" value={novoContrato.endereco||''} onChange={e=>setNovoContrato({...novoContrato,endereco:e.target.value})} placeholder="Ex: Rua Vereador Sidney Barth, nº 1.059" className={inputCls}/></div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={labelCls}>Tipo</label><select value={novoContrato.tipo} onChange={e=>setNovoContrato({...novoContrato,tipo:e.target.value})} className={inputCls}><option>Venda</option><option>Locação</option><option>Permuta</option></select></div>
           <div><label className={labelCls}>Valor</label><input type="text" value={novoContrato.valor} onChange={e=>setNovoContrato({...novoContrato,valor:e.target.value})} placeholder="R$ 000,00" className={inputCls}/></div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div><label className={labelCls}>Tipo de Imóvel</label><select value={novoContrato.tipoImovel||''} onChange={e=>setNovoContrato({...novoContrato,tipoImovel:e.target.value})} className={inputCls}><option value="">Selecione</option>{TIPOS_IMOVEL.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className={labelCls}>Data Início</label><input type="date" value={novoContrato.dataInicio} onChange={e=>setNovoContrato({...novoContrato,dataInicio:e.target.value})} className={inputCls}/></div>
           <div><label className={labelCls}>Vencimento</label><input type="date" value={novoContrato.dataVencimento} onChange={e=>setNovoContrato({...novoContrato,dataVencimento:e.target.value})} className={inputCls}/></div>
         </div>
