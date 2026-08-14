@@ -9,6 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script>
@@ -276,6 +277,11 @@ function G4Investimoveis(){
   const[ordemContrato,setOrdemContrato]=useState('vencimento');
   const[buscaVisita,setBuscaVisita]=useState('');
   const[showGerador,setShowGerador]=useState(false);
+  const[showFichaModal,setShowFichaModal]=useState(false);
+  const[fichaImoveis,setFichaImoveis]=useState([]);
+  const[fichaSelecionados,setFichaSelecionados]=useState([]);
+  const[fichaCarregando,setFichaCarregando]=useState(false);
+  const[fichaBusca,setFichaBusca]=useState('');
   const[dadosContrato,setDadosContrato]=useState({
     tipoImovel:'',genero:'feminino',nome:'',nacionalidade:'brasileira',profissao:'',portadorGenero:'portadora',
     rg:'',orgaoEmissor:'SSP',rgUF:'PR',cpf:'',estadoCivil:'',
@@ -633,6 +639,194 @@ function G4Investimoveis(){
     if(!coords){alert('Não consegui identificar a localização. Copie o link do Google Maps (Compartilhar > Copiar link) ou as coordenadas no formato "latitude, longitude".');return;}
     await fsAdd('contratos',{...c,lat:coords.lat,lng:coords.lng});
   };
+  // FICHA DE VISITA (PDF preenchível, com dados dos imóveis puxados do site público)
+  const montarEnderecoSite=(p)=>{
+    const partes=[];
+    if(p.address)partes.push(p.address+(p.number?`, nº ${p.number}`:''));
+    if(p.neighborhood)partes.push(p.neighborhood);
+    if(p.city)partes.push(`${p.city}/PR`);
+    return partes.join(' - ');
+  };
+  const montarComodos=(p)=>{
+    const partes=[];
+    if(p.bedrooms)partes.push(`${p.bedrooms} quarto${p.bedrooms>1?'s':''}`);
+    if(p.suites)partes.push(`${p.suites} suíte${p.suites>1?'s':''}`);
+    if(p.bathrooms)partes.push(`${p.bathrooms} banheiro${p.bathrooms>1?'s':''}`);
+    if(p.garages)partes.push(`${p.garages} vaga${p.garages>1?'s':''}`);
+    return partes.join(', ')||'—';
+  };
+  const montarMetragem=(p)=>{
+    const partes=[];
+    if(p.builtArea)partes.push(`${p.builtArea}m² construídos`);
+    if(p.area)partes.push(`${p.area}m² de terreno`);
+    return partes.join(' / ')||'—';
+  };
+  const abrirFichaVisita=async()=>{
+    setShowFichaModal(true);
+    setFichaCarregando(true);
+    setFichaSelecionados([]);
+    try{
+      const res=await fetch('https://firestore.googleapis.com/v1/projects/g4-investimoveis/databases/(default)/documents/properties?pageSize=300');
+      const data=await res.json();
+      const val=(v)=>{if(!v)return null;if(v.stringValue!==undefined)return v.stringValue;if(v.integerValue!==undefined)return Number(v.integerValue);if(v.doubleValue!==undefined)return v.doubleValue;if(v.booleanValue!==undefined)return v.booleanValue;return null;};
+      const arr=(v)=>{if(!v||!v.arrayValue||!v.arrayValue.values)return[];return v.arrayValue.values.map(x=>x.stringValue).filter(Boolean);};
+      const docs=(data.documents||[]).map(d=>{
+        const f=d.fields||{};
+        return{
+          id:d.name.split('/').pop(),
+          reference:val(f.reference)||'',
+          active:val(f.active),
+          endereco:montarEnderecoSite({address:val(f.address),number:val(f.number),neighborhood:val(f.neighborhood),city:val(f.city)}),
+          area:val(f.area),
+          builtArea:val(f.builtArea),
+          bedrooms:val(f.bedrooms),
+          bathrooms:val(f.bathrooms),
+          suites:val(f.suites),
+          garages:val(f.garages),
+          price:val(f.price),
+          imagemUrl:arr(f.images)[0]||'',
+        };
+      }).filter(p=>p.active&&p.reference).sort((a,b)=>a.reference.localeCompare(b.reference));
+      setFichaImoveis(docs);
+    }catch(e){
+      alert('Erro ao buscar imóveis do site público: '+e.message);
+    }finally{
+      setFichaCarregando(false);
+    }
+  };
+  const toggleFichaSelecionado=(ref)=>{
+    setFichaSelecionados(prev=>prev.includes(ref)?prev.filter(r=>r!==ref):[...prev,ref]);
+  };
+  const gerarFichaVisitaPDF=async()=>{
+    const selecionados=fichaImoveis.filter(p=>fichaSelecionados.includes(p.reference));
+    if(selecionados.length===0){alert('Selecione ao menos um imóvel.');return;}
+    const{PDFDocument,StandardFonts,rgb}=PDFLib;
+    const pdfDoc=await PDFDocument.create();
+    let page=pdfDoc.addPage([595.28,841.89]);
+    const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold=await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const form=pdfDoc.getForm();
+    const margem=50;
+    const margemInferior=55;
+    let y=800;
+    const novaPagina=()=>{ page=pdfDoc.addPage([595.28,841.89]); y=800; };
+    // Garante espaço antes de desenhar algo com a altura informada; se não couber, pula pra
+    // nova página e retorna true (quem chamou pode repetir um cabeçalho de seção, se quiser).
+    const garantirEspaco=(altura)=>{
+      if(y-altura<margemInferior){novaPagina();return true;}
+      return false;
+    };
+    const desenhar=(texto,opts={})=>{
+      page.drawText(texto,{x:opts.x||margem,y,size:opts.size||11,font:opts.bold?fontBold:font,color:rgb(0,0,0)});
+      y-=opts.pular!==undefined?opts.pular:18;
+    };
+    const quebrarLinha=(texto,tamanho,larguraMax)=>{
+      const palavras=texto.split(' ');
+      const linhas=[];
+      let atual='';
+      palavras.forEach(p=>{
+        const teste=atual?`${atual} ${p}`:p;
+        if(font.widthOfTextAtSize(teste,tamanho)>larguraMax&&atual){linhas.push(atual);atual=p;}
+        else atual=teste;
+      });
+      if(atual)linhas.push(atual);
+      return linhas;
+    };
+    // Logo no cabeçalho
+    try{
+      const logoRes=await fetch('logo-g4.png');
+      const logoBytes=await logoRes.arrayBuffer();
+      const logoImg=await pdfDoc.embedPng(logoBytes);
+      const logoW=200,logoH=logoW*(logoImg.height/logoImg.width);
+      const logoTopo=828;
+      page.drawImage(logoImg,{x:margem,y:logoTopo-logoH,width:logoW,height:logoH});
+      const tituloTam=16;
+      const tituloTexto='FICHA DE VISITA';
+      const tituloW=fontBold.widthOfTextAtSize(tituloTexto,tituloTam);
+      page.drawText(tituloTexto,{x:(595.28-tituloW)/2,y:logoTopo-logoH/2-6,size:tituloTam,font:fontBold,color:rgb(0,0,0)});
+      y=logoTopo-logoH-8;
+    }catch(e){
+      desenhar('FICHA DE VISITA',{size:16,bold:true});
+    }
+    y-=18;
+    desenhar('Dados do cliente',{bold:true,size:13,pular:24});
+    page.drawText('Nome:',{x:margem,y,size:11,font});
+    const campoNome=form.createTextField('Nome');
+    campoNome.setText('');
+    campoNome.addToPage(page,{x:margem+48,y:y-4,width:230,height:18,font,borderWidth:0});
+    page.drawText('Telefone:',{x:margem+300,y,size:11,font});
+    const campoTelefone=form.createTextField('Telefone');
+    campoTelefone.setText('');
+    campoTelefone.addToPage(page,{x:margem+362,y:y-4,width:150,height:18,font,borderWidth:0});
+    y-=48;
+
+    desenhar('Dados do Corretor',{bold:true,size:13,pular:22});
+    desenhar('Luiz Fernando Raiffer de Oliveira, CRECI 30864 - CNAI 28880',{size:11,pular:20});
+    y-=18;
+
+    desenhar('Imóveis desta visita',{bold:true,size:13,pular:26});
+    const thumbW=85,thumbH=64,gapX=12;
+    for(const p of selecionados){
+      const linha=`REF ${p.reference} - ${p.endereco} - ${montarMetragem(p)} - ${montarComodos(p)}${p.price?` - R$ ${Number(p.price).toLocaleString('pt-BR')}`:''}`;
+      const linhasQuebradas=quebrarLinha(linha,11.5,495-thumbW-gapX);
+      let imgEmbed=null;
+      if(p.imagemUrl){
+        try{
+          const imgRes=await fetch(p.imagemUrl);
+          const imgBytes=await imgRes.arrayBuffer();
+          imgEmbed=/\.png(\?|$)/i.test(p.imagemUrl)?await pdfDoc.embedPng(imgBytes):await pdfDoc.embedJpg(imgBytes);
+        }catch(e){imgEmbed=null;}
+      }
+      const alturaTexto=linhasQuebradas.length*16;
+      const alturaBloco=Math.max(thumbH,alturaTexto);
+      const quebrou=garantirEspaco(alturaBloco+18);
+      if(quebrou)desenhar('Imóveis desta visita (continuação)',{bold:true,size:13,pular:26});
+      const topoBloco=y;
+      if(imgEmbed)page.drawImage(imgEmbed,{x:margem,y:topoBloco-thumbH,width:thumbW,height:thumbH});
+      let yTexto=topoBloco-13;
+      linhasQuebradas.forEach((l,idx)=>{
+        page.drawText(idx===0?`• ${l}`:`   ${l}`,{x:margem+thumbW+gapX,y:yTexto,size:11.5,font});
+        yTexto-=16;
+      });
+      y=topoBloco-alturaBloco-18;
+    }
+    y-=36;
+
+    garantirEspaco(24+3*19);
+    desenhar('Declaração',{bold:true,size:13,pular:24});
+    [
+      'Declaro, na qualidade de possível comprador/locatário, ter tomado conhecimento "In loco" do(s)',
+      'imóvel(eis) listados acima, e obtive os esclarecimentos referente a preços e condições de pagamento',
+      'destes com o corretor(a).',
+    ].forEach(l=>desenhar(l,{size:11,pular:19}));
+
+    y-=28;
+    garantirEspaco(26+40);
+    desenhar('Observações referente a experiência da visita',{bold:true,size:12,pular:26});
+    page.drawLine({start:{x:margem,y},end:{x:545,y},thickness:0.5,color:rgb(0.6,0.6,0.6)});y-=40;
+
+    y-=40;
+    garantirEspaco(14+9);
+    const linha1Ini=margem,linha1Fim=margem+180,linha2Ini=365,linha2Fim=545;
+    page.drawLine({start:{x:linha1Ini,y},end:{x:linha1Fim,y},thickness:0.7,color:rgb(0,0,0)});
+    page.drawLine({start:{x:linha2Ini,y},end:{x:linha2Fim,y},thickness:0.7,color:rgb(0,0,0)});
+    y-=14;
+    const txtData='Data da visita',txtAssinatura='Assinatura do cliente';
+    const wData=font.widthOfTextAtSize(txtData,9),wAssinatura=font.widthOfTextAtSize(txtAssinatura,9);
+    page.drawText(txtData,{x:(linha1Ini+linha1Fim)/2-wData/2,y,size:9,font});
+    page.drawText(txtAssinatura,{x:(linha2Ini+linha2Fim)/2-wAssinatura/2,y,size:9,font});
+
+    const bytes=await pdfDoc.save();
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`Ficha_Visita_${new Date().toISOString().split('T')[0]}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowFichaModal(false);
+  };
+
   const imoveisVisitaFiltrados=useMemo(()=>{
     if(!buscaVisita)return imoveisParaVisitar;
     const b=buscaVisita.toLowerCase();
@@ -735,7 +929,10 @@ function G4Investimoveis(){
   const acaoBtnHeader=(<>
     {abaAtiva==='home'&&<button onClick={()=>abrirNovaTarefa(null)} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Nova Tarefa</button>}
     {abaAtiva==='clientes'&&<button onClick={()=>{setEditingCliente(null);setNovoCliente({data:'',nome:'',interesse:'',tipo:'',telefone:'',valor:'',descricao:''});setShowModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Novo Cliente</button>}
-    {abaAtiva==='contratos'&&<button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>}
+    {abaAtiva==='contratos'&&<div className="flex gap-2">
+      <button onClick={abrirFichaVisita} className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors"><Icons.FileText/>Gerar Ficha de Visita</button>
+      <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className={`flex items-center gap-2 ${btnGrad}`}><Icons.Plus/>Adicionar Contrato</button>
+    </div>}
     {abaAtiva==='emAndamento'&&(
       <button onClick={()=>{setEditingContrato(null);setNovoContrato({cliente:'',endereco:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],imagemUrl:'',codigoRef:'',tipoImovel:'',ultimaVisita:''});setShowContratoModal(true);}} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600">
         <Icons.Plus/>Adicionar Contrato
@@ -1652,6 +1849,32 @@ function G4Investimoveis(){
         <div><label className={labelCls}>Status</label><select value={novoContrato.status} onChange={e=>setNovoContrato({...novoContrato,status:e.target.value})} className={inputCls}><option value="ativo">Ativo</option><option value="encerrado">Encerrado</option></select></div>
       </div>
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowContratoModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddContrato} className={`flex-1 ${btnGrad}`}>{editingContrato?'Salvar':'Adicionar'}</button></div>
+    </div></div>}
+
+    {showFichaModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto max-h-[90vh] flex flex-col">
+      <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">Gerar Ficha de Visita</h2><button onClick={()=>setShowFichaModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
+      <div className="p-5 border-b border-gray-200">
+        <input type="text" placeholder="Buscar por referência ou endereço..." value={fichaBusca} onChange={e=>setFichaBusca(e.target.value)} className={inputCls}/>
+        <p className="text-xs text-gray-500 mt-2">{fichaSelecionados.length} imóvel(is) selecionado(s)</p>
+      </div>
+      <div className="p-5 overflow-y-auto flex-1 space-y-2">
+        {fichaCarregando&&<p className="text-center text-gray-400 py-8">Buscando imóveis no site público...</p>}
+        {!fichaCarregando&&fichaImoveis.filter(p=>{
+          if(!fichaBusca)return true;
+          const b=fichaBusca.toLowerCase();
+          return p.reference.toLowerCase().includes(b)||p.endereco.toLowerCase().includes(b);
+        }).map(p=>(
+          <label key={p.id} className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox" checked={fichaSelecionados.includes(p.reference)} onChange={()=>toggleFichaSelecionado(p.reference)} className="mt-1"/>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">REF {p.reference} — {p.endereco||'—'}</p>
+              <p className="text-xs text-gray-500">{montarMetragem(p)} · {montarComodos(p)}{p.price?` · R$ ${Number(p.price).toLocaleString('pt-BR')}`:''}</p>
+            </div>
+          </label>
+        ))}
+        {!fichaCarregando&&fichaImoveis.length===0&&<p className="text-center text-gray-400 py-8">Nenhum imóvel ativo encontrado no site público.</p>}
+      </div>
+      <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowFichaModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={gerarFichaVisitaPDF} className={`flex-1 ${btnGrad}`}>Gerar PDF ({fichaSelecionados.length})</button></div>
     </div></div>}
 
     <footer className="py-6 border-t border-gray-200 bg-white no-print"><p className="text-center text-gray-500 text-sm">© 2026 G4 Investimóveis - Sistema de Gestão</p></footer>
