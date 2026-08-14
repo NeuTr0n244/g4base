@@ -48,7 +48,11 @@ async function listAllDocs(project, collection) {
     const url = firestoreUrl(project, collection) + `?pageSize=300${pageToken ? '&pageToken=' + pageToken : ''}`;
     const res = await fetch(url);
     const data = await res.json();
-    (data.documents || []).forEach(d => docs.push({ id: d.name.split('/').pop(), ...fieldsToObj(d.fields) }));
+    // O id do documento (nome real no Firestore) vem por último de propósito: alguns contratos
+    // manuais têm um campo interno "id" numérico (timestamp) que, se viesse antes, seria
+    // sobrescrito pelo id do documento — mas o inverso (o que queremos) também vale: aqui
+    // garantimos que o id do documento sempre prevalece sobre qualquer campo "id" salvo dentro dele.
+    (data.documents || []).forEach(d => docs.push({ ...fieldsToObj(d.fields), id: d.name.split('/').pop() }));
     pageToken = data.nextPageToken || '';
   } while (pageToken);
   return docs;
