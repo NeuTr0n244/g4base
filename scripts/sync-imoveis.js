@@ -94,9 +94,10 @@ function mapearTipoNegocio(transaction) {
 const PLACEHOLDER_PREFIX = 'Aguardando cliente — Ref.';
 
 async function main() {
-  console.log('Buscando imóveis ativos no site público...');
+  console.log('Buscando imóveis do site público...');
   const properties = await listAllDocs(SITE_PROJECT, 'properties');
   const ativos = properties.filter(p => p.active === true);
+  const inativos = properties.filter(p => p.active === false);
   console.log(`Imóveis ativos no site público: ${ativos.length}`);
 
   console.log('Buscando contratos já existentes no G4...');
@@ -111,27 +112,45 @@ async function main() {
     (existentesPorRef[c.codigoRef] = existentesPorRef[c.codigoRef] || []).push(c);
   });
 
+  // Acha o contrato do G4 correspondente a um imóvel do site: prioriza um contrato manual
+  // (nome real) com o mesmo código de referência; senão usa o "site-{id}" que o sync administra.
+  const acharContratoDoImovel = (p) => {
+    const contratoId = `site-${p.id}`;
+    if (p.reference) {
+      const manual = (existentesPorRef[p.reference] || [])
+        .find(c => c.id !== contratoId && c.cliente && !c.cliente.startsWith(PLACEHOLDER_PREFIX));
+      if (manual) return { contrato: manual, ehManual: true };
+    }
+    return { contrato: existentesPorId[contratoId] || null, ehManual: false, contratoId };
+  };
+
   const hojeStr = new Date().toISOString().split('T')[0];
 
   for (const p of ativos) {
-    const contratoId = `site-${p.id}`;
-    const existente = existentesPorId[contratoId] || null;
+    const { contrato: existente, ehManual, contratoId } = acharContratoDoImovel(p);
 
-    // Se já existe outro contrato (com ID diferente) pra essa mesma referência e ele já tem
-    // nome real (não é placeholder), a equipe já cuidou desse imóvel manualmente — não mexe
-    // nele, e apaga a duplicata que o próprio sync criou, se houver.
-    if (p.reference) {
-      const duplicataManual = (existentesPorRef[p.reference] || [])
-        .find(c => c.id !== contratoId && c.cliente && !c.cliente.startsWith(PLACEHOLDER_PREFIX));
-      if (duplicataManual) {
-        if (existente) {
-          await fetch(firestoreUrl(G4_PROJECT, `contratos/${contratoId}`), { method: 'DELETE' });
-          console.log(`🗑 Duplicata removida (Ref. ${p.reference}) — já existe contrato manual "${duplicataManual.cliente}"`);
-        } else {
-          console.log(`↷ Ref. ${p.reference} já tem contrato manual ("${duplicataManual.cliente}") — pulando.`);
-        }
-        continue;
+    // Contrato já cadastrado manualmente pra essa referência: não mexe no nome/endereço/etc,
+    // só mantém o valor em dia com o site público (é o único campo que a equipe pediu pra
+    // acompanhar automaticamente nesse caso). Também limpa uma eventual duplicata "site-"
+    // antiga da mesma referência.
+    if (ehManual) {
+      const valorAtual = p.price ? `R$ ${Number(p.price).toLocaleString('pt-BR')}` : '';
+      if (valorAtual && valorAtual !== existente.valor) {
+        const atualizado = { ...existente, valor: valorAtual };
+        const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${existente.id}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: objToFields(atualizado) }),
+        });
+        if (res.ok) console.log(`💲 Valor atualizado (contrato manual): ${existente.cliente} → ${valorAtual}`);
+        else console.error(`✗ Falha ao atualizar valor de ${existente.id}:`, await res.text());
       }
+      const duplicataSite = existentesPorId[`site-${p.id}`];
+      if (duplicataSite) {
+        await fetch(firestoreUrl(G4_PROJECT, `contratos/site-${p.id}`), { method: 'DELETE' });
+        console.log(`🗑 Duplicata removida (Ref. ${p.reference}) — já existe contrato manual "${existente.cliente}"`);
+      }
+      continue;
     }
 
     // Campos do próprio imóvel: sempre espelham o site público (preço, endereço, foto, tipo).
@@ -213,13 +232,23 @@ async function main() {
 
   // Imóvel que ficou INATIVO no site (mas ainda existe lá, só pausado) não é removido — só
   // ganha uma tag "Inativo" aqui, pra equipe saber que ele saiu do ar sem perder o contrato.
-  const inativos = properties.filter(p => p.active === false);
+  // Vale tanto pra contrato sincronizado quanto pra contrato manual da mesma referência.
   for (const p of inativos) {
-    const contratoId = `site-${p.id}`;
-    const existente = existentesPorId[contratoId] || null;
-    if (!existente || existente.inativoNoSite === true) continue; // não existe aqui, ou já marcado
-    const contrato = { ...existente, id: contratoId, inativoNoSite: true };
-    const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${contratoId}`), {
+    const { contrato: existente, ehManual, contratoId } = acharContratoDoImovel(p);
+    if (!existente) continue;
+    // Se achou um contrato manual, limpa uma eventual duplicata "site-" que tenha sobrado
+    // de antes (ex: sincronizada enquanto o imóvel ainda estava ativo).
+    if (ehManual) {
+      const duplicataSite = existentesPorId[`site-${p.id}`];
+      if (duplicataSite) {
+        await fetch(firestoreUrl(G4_PROJECT, `contratos/site-${p.id}`), { method: 'DELETE' });
+        console.log(`🗑 Duplicata removida (Ref. ${p.reference}, imóvel inativo) — já existe contrato manual "${existente.cliente}"`);
+      }
+    }
+    if (existente.inativoNoSite === true) continue; // já marcado
+    const idAlvo = existente.id || contratoId;
+    const contrato = { ...existente, id: idAlvo, inativoNoSite: true };
+    const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${idAlvo}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: objToFields(contrato) }),
@@ -227,20 +256,21 @@ async function main() {
     if (res.ok) {
       console.log(`⏸ Marcado como inativo no site: ${existente.cliente} (${existente.endereco})`);
     } else {
-      console.error(`✗ Falha ao marcar inativo ${contratoId}:`, await res.text());
+      console.error(`✗ Falha ao marcar inativo ${idAlvo}:`, await res.text());
     }
   }
 
-  // Remove contratos sincronizados cujo imóvel foi removido de vez do site público (não existe
-  // mais lá, nem como inativo) — só quando ainda estiverem no placeholder. Se a equipe já
-  // digitou um nome real, protege e mantém (pode ser uma venda já concretizada).
+  // Remove QUALQUER contrato (sincronizado ou manual) cujo imóvel foi removido de vez do site
+  // público — a equipe pediu explicitamente que isso valha também pra contratos manuais com
+  // nome real, mesmo sem poder desfazer depois. Assume que codigoRef, quando preenchido, sempre
+  // corresponde a uma referência do site público (convenção usada em todos os contratos daqui).
+  const refsNoSite = new Set(properties.filter(p => p.reference).map(p => p.reference));
   const idsNoSite = new Set(properties.map(p => `site-${p.id}`));
-  const orfaos = contratosAtuais.filter(c => c.id.startsWith('site-') && !idsNoSite.has(c.id));
+  const orfaos = contratosAtuais.filter(c => {
+    if (c.id.startsWith('site-')) return !idsNoSite.has(c.id);
+    return c.codigoRef && !refsNoSite.has(c.codigoRef);
+  });
   for (const c of orfaos) {
-    if (c.cliente && !c.cliente.startsWith(PLACEHOLDER_PREFIX)) {
-      console.log(`⚠ ${c.id} não existe mais no site, mas já tem nome real ("${c.cliente}") — mantendo.`);
-      continue;
-    }
     const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${c.id}`), { method: 'DELETE' });
     if (res.ok) {
       console.log(`🗑 Removido (saiu do site): ${c.cliente || c.id} (${c.endereco || ''})`);
