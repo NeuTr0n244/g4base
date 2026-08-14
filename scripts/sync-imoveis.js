@@ -41,13 +41,28 @@ function objToFields(obj) {
   return fields;
 }
 
+async function fetchJsonComRetry(url, opts, tentativas = 6) {
+  for (let i = 0; i < tentativas; i++) {
+    const res = await fetch(url, opts);
+    const data = await res.json();
+    if (!data.error) return data;
+    if (i === tentativas - 1) {
+      // Esgotou as tentativas: propaga o erro pra abortar o sync inteiro em vez de seguir com
+      // dado incompleto (foi isso que causou duplicatas antes: cota falhava, script achava que
+      // não existia contrato nenhum no G4 e recriava tudo do zero).
+      throw new Error(`Falha ao acessar Firestore (${url}): ${data.error.message}`);
+    }
+    console.log(`  ...${data.error.message}, tentando de novo em 15s (tentativa ${i + 1}/${tentativas})`);
+    await new Promise(r => setTimeout(r, 15000));
+  }
+}
+
 async function listAllDocs(project, collection) {
   const docs = [];
   let pageToken = '';
   do {
     const url = firestoreUrl(project, collection) + `?pageSize=300${pageToken ? '&pageToken=' + pageToken : ''}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await fetchJsonComRetry(url);
     // O id do documento (nome real no Firestore) vem por último de propósito: alguns contratos
     // manuais têm um campo interno "id" numérico (timestamp) que, se viesse antes, seria
     // sobrescrito pelo id do documento — mas o inverso (o que queremos) também vale: aqui
