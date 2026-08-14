@@ -178,6 +178,9 @@ async function main() {
       // Checklist entra completo (9/9) na criação, pra cair direto na aba "Contratos" — depois
       // disso fica por conta da equipe marcar/desmarcar itens.
       checklist: (existente && existente.checklist) || [true, true, true, true, true, true, true, true, true],
+      // Imóvel está ativo no site público agora — garante que a tag de "Inativo" seja removida
+      // caso tenha sido pausado e reativado depois.
+      inativoNoSite: false,
     };
 
     const url = firestoreUrl(G4_PROJECT, `contratos/${contratoId}`);
@@ -193,14 +196,34 @@ async function main() {
     }
   }
 
-  // Remove contratos sincronizados cujo imóvel não está mais ativo no site público (foi
-  // removido, desativado ou vendido/alugado por lá) — só quando ainda estiverem no placeholder.
-  // Se a equipe já digitou um nome real, protege e mantém (pode ser uma venda já concretizada).
-  const idsAtivos = new Set(ativos.map(p => `site-${p.id}`));
-  const orfaos = contratosAtuais.filter(c => c.id.startsWith('site-') && !idsAtivos.has(c.id));
+  // Imóvel que ficou INATIVO no site (mas ainda existe lá, só pausado) não é removido — só
+  // ganha uma tag "Inativo" aqui, pra equipe saber que ele saiu do ar sem perder o contrato.
+  const inativos = properties.filter(p => p.active === false);
+  for (const p of inativos) {
+    const contratoId = `site-${p.id}`;
+    const existente = existentesPorId[contratoId] || null;
+    if (!existente || existente.inativoNoSite === true) continue; // não existe aqui, ou já marcado
+    const contrato = { ...existente, id: contratoId, inativoNoSite: true };
+    const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${contratoId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: objToFields(contrato) }),
+    });
+    if (res.ok) {
+      console.log(`⏸ Marcado como inativo no site: ${existente.cliente} (${existente.endereco})`);
+    } else {
+      console.error(`✗ Falha ao marcar inativo ${contratoId}:`, await res.text());
+    }
+  }
+
+  // Remove contratos sincronizados cujo imóvel foi removido de vez do site público (não existe
+  // mais lá, nem como inativo) — só quando ainda estiverem no placeholder. Se a equipe já
+  // digitou um nome real, protege e mantém (pode ser uma venda já concretizada).
+  const idsNoSite = new Set(properties.map(p => `site-${p.id}`));
+  const orfaos = contratosAtuais.filter(c => c.id.startsWith('site-') && !idsNoSite.has(c.id));
   for (const c of orfaos) {
     if (c.cliente && !c.cliente.startsWith(PLACEHOLDER_PREFIX)) {
-      console.log(`⚠ ${c.id} não está mais ativo no site, mas já tem nome real ("${c.cliente}") — mantendo.`);
+      console.log(`⚠ ${c.id} não existe mais no site, mas já tem nome real ("${c.cliente}") — mantendo.`);
       continue;
     }
     const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${c.id}`), { method: 'DELETE' });
