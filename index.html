@@ -1375,10 +1375,10 @@ function G4Investimoveis(){
                           <span className={`px-3 py-1 text-xs font-bold rounded-full ${badge.cls}`}>{badge.text}</span>
                           <span className="px-3 py-1 text-xs font-medium rounded-full bg-white/50 border">{c.tipo}</span>
                           {c.tipoImovel&&<span className={`px-3 py-1 text-xs font-bold rounded-full ${c.tipoImovel==='Lote'?'bg-purple-100 text-purple-700 border border-purple-300':'bg-white/50 border'}`}>{c.tipoImovel}</span>}
-                          <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
-                            {prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
+                          <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${c.inativoNoSite?'bg-gray-200 text-gray-500 border border-gray-300':prog.isCompleto?'bg-green-100 text-green-700 border border-green-300':'bg-amber-100 text-amber-700 border border-amber-300'}`}>
+                            {c.inativoNoSite?'Pausado':prog.isCompleto?'🟢 Ativo':`🟡 Pendente ${prog.completos}/${prog.total}`}
                           </span>
-                          {c.inativoNoSite&&<span className="px-3 py-1 text-xs font-bold rounded-full bg-gray-200 text-gray-600 border border-gray-300" title="Imóvel pausado/inativo no site público">⏸ Inativo no site</span>}
+                          {c.inativoNoSite&&<span className="px-3 py-1 text-xs font-bold rounded-full bg-gray-200 text-gray-500 border border-gray-300" title="Imóvel pausado/inativo no site público">Inativo no site</span>}
                         </div>
                         <div className="text-xl font-bold text-green-600 mb-2">{c.valor||'R$ —'}</div>
                         <div className="text-sm text-gray-500 mb-2">Código {c.codigoRef||String(c.id).padStart(3,'0')}</div>
