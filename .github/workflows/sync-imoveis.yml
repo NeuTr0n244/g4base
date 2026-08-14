@@ -10,6 +10,12 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch: {}
 
+# Garante que nunca rode mais de um ciclo ao mesmo tempo (agendado x manual, por exemplo) —
+# dois ciclos em paralelo dobram as chamadas ao Firestore e estouram a cota mais fácil.
+concurrency:
+  group: sync-imoveis
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
