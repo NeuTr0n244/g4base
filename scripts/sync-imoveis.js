@@ -80,11 +80,6 @@ async function main() {
   const ativos = properties.filter(p => p.active === true);
   console.log(`Imóveis ativos no site público: ${ativos.length}`);
 
-  if (ativos.length === 0) {
-    console.log('Nada novo para sincronizar.');
-    return;
-  }
-
   console.log('Buscando contratos já existentes no G4...');
   const contratosAtuais = await listAllDocs(G4_PROJECT, 'contratos');
   const existentesPorId = {};
@@ -191,6 +186,24 @@ async function main() {
       console.log(`✓ Sincronizado: ${contrato.cliente} (${contrato.endereco})`);
     } else {
       console.error(`✗ Falha ao sincronizar ${contratoId}:`, await res.text());
+    }
+  }
+
+  // Remove contratos sincronizados cujo imóvel não está mais ativo no site público (foi
+  // removido, desativado ou vendido/alugado por lá) — só quando ainda estiverem no placeholder.
+  // Se a equipe já digitou um nome real, protege e mantém (pode ser uma venda já concretizada).
+  const idsAtivos = new Set(ativos.map(p => `site-${p.id}`));
+  const orfaos = contratosAtuais.filter(c => c.id.startsWith('site-') && !idsAtivos.has(c.id));
+  for (const c of orfaos) {
+    if (c.cliente && !c.cliente.startsWith(PLACEHOLDER_PREFIX)) {
+      console.log(`⚠ ${c.id} não está mais ativo no site, mas já tem nome real ("${c.cliente}") — mantendo.`);
+      continue;
+    }
+    const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${c.id}`), { method: 'DELETE' });
+    if (res.ok) {
+      console.log(`🗑 Removido (saiu do site): ${c.cliente || c.id} (${c.endereco || ''})`);
+    } else {
+      console.error(`✗ Falha ao remover ${c.id}:`, await res.text());
     }
   }
 }
