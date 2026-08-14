@@ -30,6 +30,9 @@ jobs:
           FIM=$((SECONDS + 340*60))
           while [ $SECONDS -lt $FIM ]; do
             echo "=== $(date -u +%H:%M:%SZ) UTC ==="
-            node scripts/sync-imoveis.js
+            # Sem "|| true" aqui, um ciclo que falhar (ex: cota do Firestore) mataria o loop
+            # inteiro (o job roda com "set -e"), em vez de só pular esse ciclo e tentar de
+            # novo em 5 min.
+            node scripts/sync-imoveis.js || echo "Ciclo falhou, tentando de novo em 5 min."
             sleep 300
           done
