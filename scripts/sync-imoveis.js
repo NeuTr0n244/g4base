@@ -6,7 +6,7 @@
 const SITE_PROJECT = 'g4-investimoveis';
 const G4_PROJECT = 'g4base-41f45';
 
-const TIPOS_VALIDOS = ['Lote', 'Casa', 'Apartamento', 'Comercial', 'Outro'];
+const TIPOS_VALIDOS = ['Lote', 'Casa', 'Apartamento', 'Comercial', 'Sobrado', 'Terreno', 'Casa/Sala Comercial', 'Casa/Sobrado', 'Sala Comercial', 'Apartamento Triplex', 'Outro'];
 
 function firestoreUrl(project, path) {
   return `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}`;
