@@ -159,7 +159,7 @@ async function main() {
       dataVencimento = existente.dataVencimento;
     } else {
       const v = new Date(dataInicio + 'T00:00:00');
-      v.setMonth(v.getMonth() + 12);
+      v.setMonth(v.getMonth() + 24);
       dataVencimento = v.toISOString().split('T')[0];
     }
 
