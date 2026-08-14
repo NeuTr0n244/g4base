@@ -1124,6 +1124,7 @@ function G4Investimoveis(){
             <option value="vencimento">Ordenar: Vencimento (padrão)</option>
             <option value="recentes">Ordenar: Mais recentes primeiro</option>
             <option value="antigos">Ordenar: Mais antigos primeiro</option>
+            <option value="inativos">Filtrar: Só inativos no site</option>
           </select>
         </div>
 
@@ -1133,6 +1134,7 @@ function G4Investimoveis(){
             .filter(c=>{
               const prog=getChecklistProgress(c);
               if(!prog.isCompleto)return false; // Apenas completos (9/9)
+              if(ordemContrato==='inativos'&&!c.inativoNoSite)return false;
               if(!buscaContrato)return true;
               const busca=buscaContrato.toLowerCase();
               const nome=(c.cliente||'').toLowerCase();
