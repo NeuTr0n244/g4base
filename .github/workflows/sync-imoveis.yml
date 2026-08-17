@@ -2,10 +2,11 @@ name: Sincronizar imóveis do site público
 
 # O agendador "schedule" do GitHub Actions não garante o horário exato (pode atrasar
 # horas em contas gratuitas). Por isso o job roda em loop interno, checando a cada
-# 1 minuto de verdade por ~5h40, e o cron só reinicia esse loop a cada 6 horas
+# 5 minutos de verdade por ~5h40, e o cron só reinicia esse loop a cada 6 horas
 # (rede de segurança caso o job pare por qualquer motivo).
-# Projeto está no plano Blaze do Firebase, então não trava mais por cota — só isso permite
-# rodar tão rápido sem risco de ficar bloqueado no meio do dia.
+# Projeto está no plano Blaze do Firebase (não trava mais por cota), mas cada ciclo lê ~90
+# documentos (imóveis do site + contratos do G4) — em 1 minuto isso vira ~130 mil leituras/dia
+# e gera custo real. 5 minutos reduz pra ~26 mil/dia, ainda bem rápido pra atualizar o site.
 
 on:
   schedule:
@@ -27,13 +28,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Loop de sincronização a cada 1 minuto
+      - name: Loop de sincronização a cada 5 minutos
         run: |
           FIM=$((SECONDS + 340*60))
           while [ $SECONDS -lt $FIM ]; do
             echo "=== $(date -u +%H:%M:%SZ) UTC ==="
             # Sem "|| true" aqui, um ciclo que falhar (ex: erro de rede) mataria o loop inteiro
-            # (o job roda com "set -e"), em vez de só pular esse ciclo e tentar de novo em 1 min.
-            node scripts/sync-imoveis.js || echo "Ciclo falhou, tentando de novo em 1 min."
-            sleep 60
+            # (o job roda com "set -e"), em vez de só pular esse ciclo e tentar de novo em 5 min.
+            node scripts/sync-imoveis.js || echo "Ciclo falhou, tentando de novo em 5 min."
+            sleep 300
           done
