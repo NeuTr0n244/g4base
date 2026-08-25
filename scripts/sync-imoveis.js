@@ -260,10 +260,10 @@ async function main() {
     }
   }
 
-  // Remove QUALQUER contrato (sincronizado ou manual) cujo imóvel foi removido de vez do site
-  // público — a equipe pediu explicitamente que isso valha também pra contratos manuais com
-  // nome real, mesmo sem poder desfazer depois. Assume que codigoRef, quando preenchido, sempre
-  // corresponde a uma referência do site público (convenção usada em todos os contratos daqui).
+  // Imóvel removido de vez do site público (não existe mais lá, nem inativo): NÃO apaga o
+  // contrato — só marca como inativo, igual ao caso de imóvel pausado. Assim a equipe sempre
+  // consegue revisar na aba Inativos antes de decidir apagar manualmente, sem risco de perder
+  // histórico sem querer.
   const refsNoSite = new Set(properties.filter(p => p.reference).map(p => p.reference));
   const idsNoSite = new Set(properties.map(p => `site-${p.id}`));
   const orfaos = contratosAtuais.filter(c => {
@@ -271,11 +271,17 @@ async function main() {
     return c.codigoRef && !refsNoSite.has(c.codigoRef);
   });
   for (const c of orfaos) {
-    const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${c.id}`), { method: 'DELETE' });
+    if (c.inativoNoSite === true) continue; // já marcado
+    const atualizado = { ...c, inativoNoSite: true };
+    const res = await fetch(firestoreUrl(G4_PROJECT, `contratos/${c.id}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: objToFields(atualizado) }),
+    });
     if (res.ok) {
-      console.log(`🗑 Removido (saiu do site): ${c.cliente || c.id} (${c.endereco || ''})`);
+      console.log(`⏸ Marcado como inativo (saiu do site): ${c.cliente || c.id} (${c.endereco || ''})`);
     } else {
-      console.error(`✗ Falha ao remover ${c.id}:`, await res.text());
+      console.error(`✗ Falha ao marcar inativo ${c.id}:`, await res.text());
     }
   }
 }
