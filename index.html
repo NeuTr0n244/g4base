@@ -275,6 +275,7 @@ function G4Investimoveis(){
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[buscaContrato,setBuscaContrato]=useState('');
   const[ordemContrato,setOrdemContrato]=useState('vencimento');
+  const[subAbaContrato,setSubAbaContrato]=useState('ativos');
   const[buscaVisita,setBuscaVisita]=useState('');
   const[showGerador,setShowGerador]=useState(false);
   const[showFichaModal,setShowFichaModal]=useState(false);
@@ -1299,7 +1300,13 @@ function G4Investimoveis(){
         </div>
 
         {/* Lista de Contratos */}
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Contratos Ativos</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">{subAbaContrato==='ativos'?'Contratos Ativos':'Contratos Inativos'}</h2>
+
+        {/* Alternador Ativos / Inativos */}
+        <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 mb-6 bg-white">
+          <button onClick={()=>setSubAbaContrato('ativos')} className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${subAbaContrato==='ativos'?'bg-gray-800 text-white':'text-gray-600 hover:bg-gray-100'}`}>Ativos</button>
+          <button onClick={()=>setSubAbaContrato('inativos')} className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${subAbaContrato==='inativos'?'bg-gray-800 text-white':'text-gray-600 hover:bg-gray-100'}`}>Inativos</button>
+        </div>
 
         {/* Barra de Pesquisa e Ordenação */}
         <div className="mb-6 flex flex-col sm:flex-row gap-3">
@@ -1321,7 +1328,6 @@ function G4Investimoveis(){
             <option value="vencimento">Ordenar: Vencimento (padrão)</option>
             <option value="recentes">Ordenar: Mais recentes primeiro</option>
             <option value="antigos">Ordenar: Mais antigos primeiro</option>
-            <option value="inativos">Filtrar: Só inativos no site</option>
           </select>
         </div>
 
@@ -1331,7 +1337,9 @@ function G4Investimoveis(){
             .filter(c=>{
               const prog=getChecklistProgress(c);
               if(!prog.isCompleto)return false; // Apenas completos (9/9)
-              if(ordemContrato==='inativos'&&!c.inativoNoSite)return false;
+              const ehInativo=c.status==='encerrado'||c.inativoNoSite===true;
+              if(subAbaContrato==='inativos'&&!ehInativo)return false;
+              if(subAbaContrato==='ativos'&&ehInativo)return false;
               if(!buscaContrato)return true;
               const busca=buscaContrato.toLowerCase();
               const nome=(c.cliente||'').toLowerCase();
