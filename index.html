@@ -293,7 +293,7 @@ function G4Investimoveis(){
     endereco:'',cidade:'Mamborê/PR',cep:'87340-000',email:'',telefone:'',
     dataTerraN:'',dataTerraNExtenso:'',quadraN:'',quadraNExtenso:'',areaM2:'',
     enderecoImovel:'',cidadeImovel:'Mamborê/PR',matricula:'',livro:'',
-    valorVenda:'',valorVendaExtenso:'',vigenciaMeses:'12',vigenciaMesesExtenso:'doze',
+    valorVenda:'',valorVendaExtenso:'',vigenciaMeses:'24',vigenciaMesesExtenso:'vinte e quatro',
     comissaoPercent:'5',comissaoPercentExtenso:'cinco por cento',
     testemunhaNome:'',testemunhaCPF:'',dataContrato:''
   });
@@ -1754,7 +1754,7 @@ function G4Investimoveis(){
               
               // Salvar contrato no Firebase para aparecer em "Em Andamento"
               const hoje=new Date();
-              const vigencia=parseInt(dadosContrato.vigenciaMeses)||12;
+              const vigencia=parseInt(dadosContrato.vigenciaMeses)||24;
               const vencimento=new Date(hoje);
               vencimento.setMonth(vencimento.getMonth()+vigencia);
               
@@ -1851,7 +1851,16 @@ function G4Investimoveis(){
         </div>
         <div><label className={labelCls}>Tipo de Imóvel</label><select value={novoContrato.tipoImovel||''} onChange={e=>setNovoContrato({...novoContrato,tipoImovel:e.target.value})} className={inputCls}><option value="">Selecione</option>{TIPOS_IMOVEL.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className={labelCls}>Data Início</label><input type="date" value={novoContrato.dataInicio} onChange={e=>setNovoContrato({...novoContrato,dataInicio:e.target.value})} className={inputCls}/></div>
+          <div><label className={labelCls}>Data Início</label><input type="date" value={novoContrato.dataInicio} onChange={e=>{
+            const novaDataInicio=e.target.value;
+            let novoVencimento=novoContrato.dataVencimento;
+            if(novaDataInicio){
+              const v=new Date(novaDataInicio+'T00:00:00');
+              v.setMonth(v.getMonth()+24);
+              novoVencimento=v.toISOString().split('T')[0];
+            }
+            setNovoContrato({...novoContrato,dataInicio:novaDataInicio,dataVencimento:novoVencimento});
+          }} className={inputCls}/></div>
           <div><label className={labelCls}>Vencimento</label><input type="date" value={novoContrato.dataVencimento} onChange={e=>setNovoContrato({...novoContrato,dataVencimento:e.target.value})} className={inputCls}/></div>
         </div>
         <div><label className={labelCls}>Status</label><select value={novoContrato.status} onChange={e=>setNovoContrato({...novoContrato,status:e.target.value})} className={inputCls}><option value="ativo">Ativo</option><option value="encerrado">Encerrado</option></select></div>
