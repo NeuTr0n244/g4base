@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>G4 Investimóveis - Sistema de Gestão</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -25,10 +28,21 @@
     const db = firebase.firestore();
   </script>
   <style>
-    html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%}
+    html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    h1,h2,h3{font-family:'Space Grotesk',-apple-system,sans-serif;letter-spacing:-0.01em}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    @keyframes overlayIn{from{opacity:0}to{opacity:1}}
     .notif-slide{animation:slideIn .3s ease-out}.fade-in{animation:fadeIn .3s ease-out}
+    .modal-overlay{animation:overlayIn .15s ease-out}
+    .modal-box{animation:modalIn .2s cubic-bezier(.16,1,.3,1)}
+    /* Micro-interações: botões e cartões clicáveis reagem de leve ao toque/hover */
+    button:not(:disabled){transition:transform .12s ease,box-shadow .15s ease,filter .15s ease}
+    button:not(:disabled):active{transform:scale(.96)}
+    .cartao-hover{transition:transform .15s ease,box-shadow .15s ease}
+    .cartao-hover:hover{transform:translateY(-2px);box-shadow:0 8px 20px -6px rgba(0,0,0,.15)}
+    .barra-progresso{transition:width .4s cubic-bezier(.16,1,.3,1)}
     @media print{.no-print{display:none!important}.print-only{display:block!important}}
     .print-only{display:none}
     .contrato-texto{font-family:'Times New Roman',serif;font-size:13px;line-height:1.8;color:#000;text-align:justify}
@@ -1109,8 +1123,8 @@ function G4Investimoveis(){
         }
       </button>
     </div>
-    {showFundoModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setShowFundoModal(false)}>
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5" onClick={e=>e.stopPropagation()}>
+    {showFundoModal&&<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setShowFundoModal(false)}>
+      <div className="modal-box bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5" onClick={e=>e.stopPropagation()}>
         <h2 className="text-lg font-bold text-gray-800 mb-1">Fundo da tela</h2>
         <p className="text-xs text-gray-500 mb-4">Só muda pra você, nesse computador/navegador — ninguém mais vê essa foto. Vale só no modo escuro.</p>
         <label className="block w-full text-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer font-medium text-gray-700 transition-colors mb-3">
@@ -1294,7 +1308,7 @@ function G4Investimoveis(){
         <p className="text-gray-600 mb-4"><span className="font-semibold text-gray-800">{clientesFiltrados.length}</span> cliente(s)</p>
         <div className="grid gap-4">
           {clientesFiltrados.map(c=>(
-            <div key={c.id} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-all">
+            <div key={c.id} className="cartao-hover bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -1526,7 +1540,7 @@ function G4Investimoveis(){
             const prog=getChecklistProgress(c);
             const isExp=contratosExpandidos[c.id];
             return(
-            <div key={c.id} onClick={()=>abrirDetalheContrato(c)} className={`rounded-xl border shadow-sm transition-all cursor-pointer hover:shadow-md ${getStatusColor(c)}`}>
+            <div key={c.id} onClick={()=>abrirDetalheContrato(c)} className={`cartao-hover rounded-xl border shadow-sm cursor-pointer ${getStatusColor(c)}`}>
               {/* Header do Card */}
               <div className="p-5">
                 <div className="flex gap-4">
@@ -1947,7 +1961,7 @@ function G4Investimoveis(){
     )}
 
     {/* MODALS */}
-    {showModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto">
+    {showModal&&<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="modal-box bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingCliente?'Editar Cliente':'Novo Cliente'}</h2><button onClick={()=>setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3 max-h-[65vh] overflow-y-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className={labelCls}>Data</label><input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" value={novoCliente.data} onChange={e=>setNovoCliente({...novoCliente,data:mascaraData(e.target.value)})} className={inputCls}/></div><div><label className={labelCls}>Telefone</label><input type="text" inputMode="numeric" placeholder="(44) 99999-9999" value={novoCliente.telefone} onChange={e=>setNovoCliente({...novoCliente,telefone:mascaraTelefone(e.target.value)})} className={inputCls}/></div></div>
@@ -1959,7 +1973,7 @@ function G4Investimoveis(){
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddCliente} className={`flex-1 ${btnGrad}`}>{editingCliente?'Salvar':'Adicionar'}</button></div>
     </div></div>}
 
-    {showTarefaModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
+    {showTarefaModal&&<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="modal-box bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingTarefa?'Editar Tarefa':'Nova Tarefa'}</h2><button onClick={()=>setShowTarefaModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3">
         <div><label className={labelCls}>Título *</label><input type="text" value={novaTarefa.titulo} onChange={e=>setNovaTarefa({...novaTarefa,titulo:e.target.value})} placeholder="Ex: Visitar imóvel..." className={inputCls}/></div>
@@ -1994,7 +2008,7 @@ function G4Investimoveis(){
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowTarefaModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddTarefa} className={`flex-1 ${btnGrad}`}>{editingTarefa?'Salvar':'Adicionar'}</button></div>
     </div></div>}
 
-    {showContratoModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
+    {showContratoModal&&<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="modal-box bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">{editingContrato?'Editar Contrato':'Novo Contrato'}</h2><button onClick={()=>setShowContratoModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 space-y-3">
         <div><label className={labelCls}>Imagem do Contrato</label>
@@ -2046,7 +2060,7 @@ function G4Investimoveis(){
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowContratoModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddContrato} className={`flex-1 ${btnGrad}`}>{editingContrato?'Salvar':'Adicionar'}</button></div>
     </div></div>}
 
-    {showFichaModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto max-h-[90vh] flex flex-col">
+    {showFichaModal&&<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="modal-box bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto max-h-[90vh] flex flex-col">
       <div className="flex items-center justify-between p-5 border-b border-gray-200"><h2 className="text-xl font-bold text-gray-800">Gerar Ficha de Visita</h2><button onClick={()=>setShowFichaModal(false)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button></div>
       <div className="p-5 border-b border-gray-200">
         <input type="text" placeholder="Buscar por referência ou endereço..." value={fichaBusca} onChange={e=>setFichaBusca(e.target.value)} className={inputCls}/>
@@ -2073,8 +2087,8 @@ function G4Investimoveis(){
     </div></div>}
 
     {/* ====== DETALHE DO CONTRATO (info + Documentos/Fotos/Contrato no Drive) ====== */}
-    {contratoDetalhe&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={()=>setContratoDetalhe(null)}>
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-auto max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+    {contratoDetalhe&&<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={()=>setContratoDetalhe(null)}>
+      <div className="modal-box bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-auto max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-800">{contratoDetalhe.cliente}</h2>
