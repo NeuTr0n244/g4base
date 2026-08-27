@@ -315,6 +315,7 @@ function G4Investimoveis(){
   const[driveConectado,setDriveConectado]=useState(false);
   const[driveCarregando,setDriveCarregando]=useState(false);
   const[driveArquivos,setDriveArquivos]=useState({documentos:[],fotos:[],contrato:[]});
+  const[drivePastaId,setDrivePastaId]=useState('');
   const driveTokenRef=React.useRef('');
   const driveTokenClientRef=React.useRef(null);
 
@@ -389,6 +390,7 @@ function G4Investimoveis(){
     setDriveCarregando(true);
     try{
       const pastas=await driveGarantirPastasContrato(c);
+      setDrivePastaId(pastas.pastaContratoId);
       const [documentos,fotos,contrato]=await Promise.all([
         driveListarArquivos(pastas.documentos),
         driveListarArquivos(pastas.fotos),
@@ -406,6 +408,7 @@ function G4Investimoveis(){
     setContratoDetalhe(c);
     setDriveAbaAtiva('documentos');
     setDriveArquivos({documentos:[],fotos:[],contrato:[]});
+    setDrivePastaId('');
     if(driveConectado)await carregarArquivosContrato(c);
   };
   const enviarArquivoParaCategoria=async(categoria,file)=>{
@@ -2140,6 +2143,7 @@ function G4Investimoveis(){
           )}
 
           {driveConectado&&(<>
+            {drivePastaId&&<div className="px-5 pt-3"><a href={`https://drive.google.com/drive/folders/${drivePastaId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">📁 Abrir pasta completa no Drive</a></div>}
             {/* Abas Documentos / Fotos / Contrato */}
             <div className="flex border-b border-gray-200 px-5 pt-3 gap-1">
               {[{k:'documentos',l:'Documentos'},{k:'fotos',l:'Fotos'},{k:'contrato',l:'Contrato'}].map(ab=>(
