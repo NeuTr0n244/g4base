@@ -239,10 +239,18 @@ function G4Investimoveis(){
   const[syncStatus,setSyncStatus]=useState('');
   // Fundo personalizado: fica salvo só no navegador de quem escolheu (localStorage), nunca
   // sincroniza com o Firebase — cada pessoa que acessa o site pode ter o seu próprio, sem
-  // aparecer pra ninguém mais.
+  // aparecer pra ninguém mais. Modo claro/escuro segue a mesma lógica (só local).
   const[fundoImagem,setFundoImagem]=useState(()=>{
     try{return localStorage.getItem('g4_fundo_imagem')||'';}catch(e){return '';}
   });
+  const[temaFundo,setTemaFundo]=useState(()=>{
+    try{return localStorage.getItem('g4_tema_fundo')||'claro';}catch(e){return 'claro';}
+  });
+  const alternarTema=()=>{
+    const novo=temaFundo==='claro'?'escuro':'claro';
+    setTemaFundo(novo);
+    try{localStorage.setItem('g4_tema_fundo',novo);}catch(e){}
+  };
   const[showFundoModal,setShowFundoModal]=useState(false);
   const escolherFundo=(file)=>{
     if(!file)return;
@@ -978,19 +986,31 @@ function G4Investimoveis(){
   return(
   <div
     className="min-h-screen"
-    style={fundoImagem
-      ? {backgroundImage:`url(${fundoImagem})`,backgroundSize:'cover',backgroundPosition:'center',backgroundAttachment:'fixed'}
-      : {backgroundColor:'#3a3f47'}
+    style={temaFundo==='escuro'
+      ? (fundoImagem
+          ? {backgroundImage:`url(${fundoImagem})`,backgroundSize:'cover',backgroundPosition:'center',backgroundAttachment:'fixed'}
+          : {backgroundColor:'#3a3f47'})
+      : {backgroundColor:'#f3f4f6'}
     }
   >
-    {/* Botão flutuante: trocar fundo (só afeta esse navegador, não sincroniza com ninguém) */}
-    <button onClick={()=>setShowFundoModal(true)} title="Trocar fundo (só neste computador)" className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-800 text-white shadow-lg flex items-center justify-center backdrop-blur-sm transition-colors">
-      <Icons.Camera/>
-    </button>
+    {/* Botões flutuantes: alternar claro/escuro, e trocar fundo (só afeta esse navegador) */}
+    <div className="fixed bottom-5 right-5 z-40 flex flex-col gap-3">
+      {temaFundo==='escuro'&&(
+        <button onClick={()=>setShowFundoModal(true)} title="Trocar fundo (só neste computador)" className="w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-800 text-white shadow-lg flex items-center justify-center backdrop-blur-sm transition-colors">
+          <Icons.Camera/>
+        </button>
+      )}
+      <button onClick={alternarTema} title={temaFundo==='claro'?'Ativar modo escuro':'Ativar modo claro'} className="w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-800 text-white shadow-lg flex items-center justify-center backdrop-blur-sm transition-colors">
+        {temaFundo==='claro'
+          ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        }
+      </button>
+    </div>
     {showFundoModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setShowFundoModal(false)}>
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5" onClick={e=>e.stopPropagation()}>
         <h2 className="text-lg font-bold text-gray-800 mb-1">Fundo da tela</h2>
-        <p className="text-xs text-gray-500 mb-4">Só muda pra você, nesse computador/navegador — ninguém mais vê essa foto.</p>
+        <p className="text-xs text-gray-500 mb-4">Só muda pra você, nesse computador/navegador — ninguém mais vê essa foto. Vale só no modo escuro.</p>
         <label className="block w-full text-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer font-medium text-gray-700 transition-colors mb-3">
           Escolher foto do computador
           <input type="file" accept="image/*" className="hidden" onChange={e=>escolherFundo(e.target.files[0])}/>
