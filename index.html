@@ -425,6 +425,20 @@ function G4Investimoveis(){
       setDriveCarregando(false);
     }
   };
+  const excluirArquivoDrive=async(categoria,arquivo)=>{
+    if(!confirm(`Excluir "${arquivo.name}"? Isso apaga o arquivo do Google Drive, não tem como desfazer.`))return;
+    setDriveCarregando(true);
+    try{
+      const res=await fetch(`https://www.googleapis.com/drive/v3/files/${arquivo.id}`,{method:'DELETE',headers:{Authorization:`Bearer ${driveTokenRef.current}`}});
+      if(!res.ok)throw new Error(`${res.status} ${await res.text()}`);
+      setDriveArquivos(prev=>({...prev,[categoria]:prev[categoria].filter(f=>f.id!==arquivo.id)}));
+    }catch(e){
+      console.error(e);
+      alert('Erro ao excluir arquivo: '+e.message);
+    }finally{
+      setDriveCarregando(false);
+    }
+  };
   const[buscaContrato,setBuscaContrato]=useState('');
   const[ordemContrato,setOrdemContrato]=useState('vencimento');
   const[subAbaContrato,setSubAbaContrato]=useState('ativos');
@@ -2161,7 +2175,8 @@ function G4Investimoveis(){
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {driveArquivos[driveAbaAtiva].map(f=>(
-                  <a key={f.id} href={f.webViewLink} target="_blank" rel="noopener noreferrer" className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow block">
+                  <a key={f.id} href={f.webViewLink} target="_blank" rel="noopener noreferrer" className="relative border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow block group">
+                    <button onClick={(e)=>{e.preventDefault();e.stopPropagation();excluirArquivoDrive(driveAbaAtiva,f);}} title="Excluir arquivo" className="absolute top-1.5 right-1.5 z-10 p-1.5 bg-white/90 hover:bg-red-100 text-red-500 rounded-lg shadow"><Icons.Trash2/></button>
                     {f.thumbnailLink?(
                       <img src={f.thumbnailLink} alt={f.name} className="w-full h-24 object-cover bg-gray-100"/>
                     ):(
