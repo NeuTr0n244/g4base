@@ -12,7 +12,6 @@
   <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyB7ebHZOkBRgLYVTyBJGBbexBJMJtpNusw",
@@ -24,11 +23,6 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // Preencher com o "OAuth 2.0 Client ID" (tipo "Web application") do Google Cloud Console
-    // pra ativar o envio de Documentos/Fotos/Contrato pro Google Drive, dentro do detalhe
-    // de cada contrato. Enquanto estiver vazio, o botão "Conectar Google Drive" avisa que
-    // ainda não foi configurado.
-    const GOOGLE_DRIVE_CLIENT_ID = "933386668413-afjkuoi2q6mdf4lnl8ia6vkp6mknomq1.apps.googleusercontent.com";
   </script>
   <style>
     html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%}
@@ -312,118 +306,30 @@ function G4Investimoveis(){
   const[contratosExpandidos,setContratosExpandidos]=useState({});
   const[contratoDetalhe,setContratoDetalhe]=useState(null);
   const[driveAbaAtiva,setDriveAbaAtiva]=useState('documentos');
-  const[driveConectado,setDriveConectado]=useState(false);
   const[driveCarregando,setDriveCarregando]=useState(false);
   const[driveArquivos,setDriveArquivos]=useState({documentos:[],fotos:[],contrato:[]});
   const[drivePastaId,setDrivePastaId]=useState('');
-  const driveTokenRef=React.useRef('');
-  const driveTokenClientRef=React.useRef(null);
 
   // ===== Integração Google Drive (Documentos/Fotos/Contrato de cada contrato) =====
-  // Cada pessoa conecta a própria conta do Google (nada fica salvo pra outros usuários).
-  // GOOGLE_DRIVE_CLIENT_ID precisa ser preenchido com o "OAuth 2.0 Client ID" (tipo
-  // "Web application") criado no Google Cloud Console.
-  const conectarDrive=(silencioso)=>{
-    if(!GOOGLE_DRIVE_CLIENT_ID){if(!silencioso)alert('O Google Drive ainda não foi configurado nesse site. Fale com quem cuida do sistema.');return;}
-    if(!window.google||!window.google.accounts){if(!silencioso)alert('Não consegui carregar o login do Google. Recarrega a página e tenta de novo.');return;}
-    if(!driveTokenClientRef.current){
-      driveTokenClientRef.current=google.accounts.oauth2.initTokenClient({
-        client_id:GOOGLE_DRIVE_CLIENT_ID,
-        scope:'https://www.googleapis.com/auth/drive.file',
-        callback:(resp)=>{
-          if(resp.error){
-            try{localStorage.removeItem('g4_drive_conectado');}catch(e){}
-            if(!silencioso)alert('Não consegui conectar ao Google Drive: '+resp.error);
-            return;
-          }
-          driveTokenRef.current=resp.access_token;
-          setDriveConectado(true);
-          try{localStorage.setItem('g4_drive_conectado','1');}catch(e){}
-        },
-      });
-    }
-    // "prompt:''" tenta renovar sem mostrar tela de login, aproveitando que o navegador já
-    // está logado no Google e já autorizou antes — só pede a tela de novo se isso falhar.
-    driveTokenClientRef.current.requestAccessToken(silencioso?{prompt:''}:{});
-  };
-  // Ao abrir a página, se já tinha conectado o Drive antes nesse navegador, tenta reconectar
-  // sozinho (sem precisar clicar em "Conectar Google Drive" de novo).
-  useEffect(()=>{
-    let cancelado=false;
-    let tentativas=0;
-    const tentar=()=>{
-      if(cancelado)return;
-      let jaConectouAntes=false;
-      try{jaConectouAntes=localStorage.getItem('g4_drive_conectado')==='1';}catch(e){}
-      if(!jaConectouAntes)return;
-      if(window.google&&window.google.accounts){conectarDrive(true);return;}
-      if(tentativas<20){tentativas++;setTimeout(tentar,300);}
-    };
-    tentar();
-    return ()=>{cancelado=true;};
-  },[]);
-  // Se acabou de conectar (manual ou automático) enquanto já tinha um contrato aberto na tela,
-  // carrega os arquivos dele agora — evita ficar preso mostrando "Conectar Google Drive" vazio.
-  useEffect(()=>{
-    if(driveConectado&&contratoDetalhe)carregarArquivosContrato(contratoDetalhe);
-  },[driveConectado]);
-  const driveFetch=async(url,opts={})=>{
-    const res=await fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${driveTokenRef.current}`}});
-    if(!res.ok)throw new Error(`Drive API ${res.status}: ${await res.text()}`);
-    return res.json();
-  };
-  const driveAcharOuCriarPasta=async(nome,paiId)=>{
-    const nomeEscapado=nome.replace(/'/g,"\\'");
-    const q=encodeURIComponent(`name='${nomeEscapado}' and mimeType='application/vnd.google-apps.folder' and '${paiId}' in parents and trashed=false`);
-    const busca=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
-    if(busca.files&&busca.files.length>0)return busca.files[0].id;
-    const criada=await driveFetch('https://www.googleapis.com/drive/v3/files',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:nome,mimeType:'application/vnd.google-apps.folder',parents:paiId?[paiId]:undefined}),
-    });
-    return criada.id;
-  };
-  const driveGarantirPastasContrato=async(c)=>{
-    const raizId=await driveAcharOuCriarPasta('G4 Investimóveis - Contratos','root');
-    const nomeContrato=`${c.codigoRef?('Ref. '+c.codigoRef+' - '):''}${c.cliente||'Sem nome'}`;
-    const pastaContratoId=await driveAcharOuCriarPasta(nomeContrato,raizId);
-    const [documentos,fotos,contrato]=await Promise.all([
-      driveAcharOuCriarPasta('Documentos',pastaContratoId),
-      driveAcharOuCriarPasta('Fotos',pastaContratoId),
-      driveAcharOuCriarPasta('Contrato',pastaContratoId),
-    ]);
-    return {pastaContratoId,documentos,fotos,contrato};
-  };
-  const driveListarArquivos=async(pastaId)=>{
-    const q=encodeURIComponent(`'${pastaId}' in parents and trashed=false`);
-    const data=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,webViewLink,thumbnailLink,mimeType)&orderBy=createdTime desc`);
-    return data.files||[];
-  };
-  const driveUpload=async(pastaId,file)=>{
-    const metadata={name:file.name,parents:[pastaId]};
-    const form=new FormData();
-    form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
-    form.append('file',file);
-    const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,thumbnailLink',{
-      method:'POST',
-      headers:{Authorization:`Bearer ${driveTokenRef.current}`},
-      body:form,
-    });
-    if(!res.ok)throw new Error(`Falha no upload: ${res.status} ${await res.text()}`);
-    return res.json();
+  // Passa por /api/drive.js, que guarda uma autorização única e permanente (configurada
+  // no Vercel) — ninguém precisa fazer login, funciona em qualquer aparelho direto.
+  const chamarDrive=async(body)=>{
+    const res=await fetch('/api/drive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||`Erro ${res.status}`);
+    return data;
   };
   const carregarArquivosContrato=async(c)=>{
     setDriveCarregando(true);
     try{
-      const pastas=await driveGarantirPastasContrato(c);
+      const pastas=await chamarDrive({action:'ensureFolders',codigoRef:c.codigoRef,cliente:c.cliente});
       setDrivePastaId(pastas.pastaContratoId);
       const [documentos,fotos,contrato]=await Promise.all([
-        driveListarArquivos(pastas.documentos),
-        driveListarArquivos(pastas.fotos),
-        driveListarArquivos(pastas.contrato),
+        chamarDrive({action:'list',folderId:pastas.documentos}),
+        chamarDrive({action:'list',folderId:pastas.fotos}),
+        chamarDrive({action:'list',folderId:pastas.contrato}),
       ]);
-      setDriveArquivos({documentos,fotos,contrato});
+      setDriveArquivos({documentos:documentos.files,fotos:fotos.files,contrato:contrato.files});
     }catch(e){
       console.error(e);
       alert('Erro ao acessar o Google Drive: '+e.message);
@@ -436,14 +342,21 @@ function G4Investimoveis(){
     setDriveAbaAtiva('documentos');
     setDriveArquivos({documentos:[],fotos:[],contrato:[]});
     setDrivePastaId('');
-    if(driveConectado)await carregarArquivosContrato(c);
+    await carregarArquivosContrato(c);
   };
+  const arquivoParaBase64=(file)=>new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result.split(',')[1]);
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
   const enviarArquivoParaCategoria=async(categoria,file)=>{
     if(!file||!contratoDetalhe)return;
     setDriveCarregando(true);
     try{
-      const pastas=await driveGarantirPastasContrato(contratoDetalhe);
-      await driveUpload(pastas[categoria],file);
+      const pastas=await chamarDrive({action:'ensureFolders',codigoRef:contratoDetalhe.codigoRef,cliente:contratoDetalhe.cliente});
+      const dataBase64=await arquivoParaBase64(file);
+      await chamarDrive({action:'upload',folderId:pastas[categoria],fileName:file.name,mimeType:file.type,dataBase64});
       await carregarArquivosContrato(contratoDetalhe);
     }catch(e){
       console.error(e);
@@ -456,8 +369,7 @@ function G4Investimoveis(){
     if(!confirm(`Excluir "${arquivo.name}"? Isso apaga o arquivo do Google Drive, não tem como desfazer.`))return;
     setDriveCarregando(true);
     try{
-      const res=await fetch(`https://www.googleapis.com/drive/v3/files/${arquivo.id}`,{method:'DELETE',headers:{Authorization:`Bearer ${driveTokenRef.current}`}});
-      if(!res.ok)throw new Error(`${res.status} ${await res.text()}`);
+      await chamarDrive({action:'delete',fileId:arquivo.id});
       setDriveArquivos(prev=>({...prev,[categoria]:prev[categoria].filter(f=>f.id!==arquivo.id)}));
     }catch(e){
       console.error(e);
@@ -2175,15 +2087,7 @@ function G4Investimoveis(){
             <div><span className="text-gray-500">Vencimento</span><p className="font-semibold text-gray-800">{fmtData(contratoDetalhe.dataVencimento)}</p></div>
           </div>
 
-          {/* Google Drive: conectar */}
-          {!driveConectado&&(
-            <div className="p-5 border-b border-gray-200 text-center">
-              <p className="text-sm text-gray-600 mb-3">Conecte o Google Drive pra enviar e ver os arquivos desse contrato.</p>
-              <button onClick={conectarDrive} className={`px-5 py-2.5 ${btnGrad}`}>Conectar Google Drive</button>
-            </div>
-          )}
-
-          {driveConectado&&(<>
+          <>
             {drivePastaId&&<div className="px-5 pt-3"><a href={`https://drive.google.com/drive/folders/${drivePastaId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">📁 Abrir pasta completa no Drive</a></div>}
             {/* Abas Documentos / Fotos / Contrato */}
             <div className="flex border-b border-gray-200 px-5 pt-3 gap-1">
@@ -2215,7 +2119,7 @@ function G4Investimoveis(){
               </div>
               {!driveCarregando&&driveArquivos[driveAbaAtiva].length===0&&<p className="text-center text-gray-400 py-6 text-sm">Nenhum arquivo enviado ainda nessa categoria.</p>}
             </div>
-          </>)}
+          </>
         </div>
       </div>
     </div>}
