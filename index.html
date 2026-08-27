@@ -12,6 +12,7 @@
   <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyB7ebHZOkBRgLYVTyBJGBbexBJMJtpNusw",
@@ -23,6 +24,11 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    // Preencher com o "OAuth 2.0 Client ID" (tipo "Web application") do Google Cloud Console
+    // pra ativar o envio de Documentos/Fotos/Contrato pro Google Drive, dentro do detalhe
+    // de cada contrato. Enquanto estiver vazio, o botão "Conectar Google Drive" avisa que
+    // ainda não foi configurado.
+    const GOOGLE_DRIVE_CLIENT_ID = "";
   </script>
   <style>
     html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%}
@@ -304,6 +310,118 @@ function G4Investimoveis(){
   const[editingContrato,setEditingContrato]=useState(null);
   const[novoContrato,setNovoContrato]=useState({cliente:'',tipo:'Venda',valor:'',dataInicio:'',dataVencimento:'',status:'ativo',checklist:[false,false,false,false,false,false,false,false,false],endereco:'',codigoRef:'',imagemUrl:'',tipoImovel:'',ultimaVisita:''});
   const[contratosExpandidos,setContratosExpandidos]=useState({});
+  const[contratoDetalhe,setContratoDetalhe]=useState(null);
+  const[driveAbaAtiva,setDriveAbaAtiva]=useState('documentos');
+  const[driveConectado,setDriveConectado]=useState(false);
+  const[driveCarregando,setDriveCarregando]=useState(false);
+  const[driveArquivos,setDriveArquivos]=useState({documentos:[],fotos:[],contrato:[]});
+  const driveTokenRef=React.useRef('');
+  const driveTokenClientRef=React.useRef(null);
+
+  // ===== Integração Google Drive (Documentos/Fotos/Contrato de cada contrato) =====
+  // Cada pessoa conecta a própria conta do Google (nada fica salvo pra outros usuários).
+  // GOOGLE_DRIVE_CLIENT_ID precisa ser preenchido com o "OAuth 2.0 Client ID" (tipo
+  // "Web application") criado no Google Cloud Console.
+  const conectarDrive=()=>{
+    if(!GOOGLE_DRIVE_CLIENT_ID){alert('O Google Drive ainda não foi configurado nesse site. Fale com quem cuida do sistema.');return;}
+    if(!window.google||!window.google.accounts){alert('Não consegui carregar o login do Google. Recarrega a página e tenta de novo.');return;}
+    if(!driveTokenClientRef.current){
+      driveTokenClientRef.current=google.accounts.oauth2.initTokenClient({
+        client_id:GOOGLE_DRIVE_CLIENT_ID,
+        scope:'https://www.googleapis.com/auth/drive.file',
+        callback:(resp)=>{
+          if(resp.error){alert('Não consegui conectar ao Google Drive: '+resp.error);return;}
+          driveTokenRef.current=resp.access_token;
+          setDriveConectado(true);
+          if(contratoDetalhe)carregarArquivosContrato(contratoDetalhe);
+        },
+      });
+    }
+    driveTokenClientRef.current.requestAccessToken();
+  };
+  const driveFetch=async(url,opts={})=>{
+    const res=await fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${driveTokenRef.current}`}});
+    if(!res.ok)throw new Error(`Drive API ${res.status}: ${await res.text()}`);
+    return res.json();
+  };
+  const driveAcharOuCriarPasta=async(nome,paiId)=>{
+    const nomeEscapado=nome.replace(/'/g,"\\'");
+    const q=encodeURIComponent(`name='${nomeEscapado}' and mimeType='application/vnd.google-apps.folder' and '${paiId}' in parents and trashed=false`);
+    const busca=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+    if(busca.files&&busca.files.length>0)return busca.files[0].id;
+    const criada=await driveFetch('https://www.googleapis.com/drive/v3/files',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:nome,mimeType:'application/vnd.google-apps.folder',parents:paiId?[paiId]:undefined}),
+    });
+    return criada.id;
+  };
+  const driveGarantirPastasContrato=async(c)=>{
+    const raizId=await driveAcharOuCriarPasta('G4 Investimóveis - Contratos','root');
+    const nomeContrato=`${c.codigoRef?('Ref. '+c.codigoRef+' - '):''}${c.cliente||'Sem nome'}`;
+    const pastaContratoId=await driveAcharOuCriarPasta(nomeContrato,raizId);
+    const [documentos,fotos,contrato]=await Promise.all([
+      driveAcharOuCriarPasta('Documentos',pastaContratoId),
+      driveAcharOuCriarPasta('Fotos',pastaContratoId),
+      driveAcharOuCriarPasta('Contrato',pastaContratoId),
+    ]);
+    return {pastaContratoId,documentos,fotos,contrato};
+  };
+  const driveListarArquivos=async(pastaId)=>{
+    const q=encodeURIComponent(`'${pastaId}' in parents and trashed=false`);
+    const data=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,webViewLink,thumbnailLink,mimeType)&orderBy=createdTime desc`);
+    return data.files||[];
+  };
+  const driveUpload=async(pastaId,file)=>{
+    const metadata={name:file.name,parents:[pastaId]};
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
+    form.append('file',file);
+    const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,thumbnailLink',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${driveTokenRef.current}`},
+      body:form,
+    });
+    if(!res.ok)throw new Error(`Falha no upload: ${res.status} ${await res.text()}`);
+    return res.json();
+  };
+  const carregarArquivosContrato=async(c)=>{
+    setDriveCarregando(true);
+    try{
+      const pastas=await driveGarantirPastasContrato(c);
+      const [documentos,fotos,contrato]=await Promise.all([
+        driveListarArquivos(pastas.documentos),
+        driveListarArquivos(pastas.fotos),
+        driveListarArquivos(pastas.contrato),
+      ]);
+      setDriveArquivos({documentos,fotos,contrato});
+    }catch(e){
+      console.error(e);
+      alert('Erro ao acessar o Google Drive: '+e.message);
+    }finally{
+      setDriveCarregando(false);
+    }
+  };
+  const abrirDetalheContrato=async(c)=>{
+    setContratoDetalhe(c);
+    setDriveAbaAtiva('documentos');
+    setDriveArquivos({documentos:[],fotos:[],contrato:[]});
+    if(driveConectado)await carregarArquivosContrato(c);
+  };
+  const enviarArquivoParaCategoria=async(categoria,file)=>{
+    if(!file||!contratoDetalhe)return;
+    setDriveCarregando(true);
+    try{
+      const pastas=await driveGarantirPastasContrato(contratoDetalhe);
+      await driveUpload(pastas[categoria],file);
+      await carregarArquivosContrato(contratoDetalhe);
+    }catch(e){
+      console.error(e);
+      alert('Erro ao enviar arquivo: '+e.message);
+    }finally{
+      setDriveCarregando(false);
+    }
+  };
   const[buscaContrato,setBuscaContrato]=useState('');
   const[ordemContrato,setOrdemContrato]=useState('vencimento');
   const[subAbaContrato,setSubAbaContrato]=useState('ativos');
@@ -1446,7 +1564,7 @@ function G4Investimoveis(){
             const prog=getChecklistProgress(c);
             const isExp=contratosExpandidos[c.id];
             return(
-            <div key={c.id} className={`rounded-xl border shadow-sm transition-all ${getStatusColor(c)}`}>
+            <div key={c.id} onClick={()=>abrirDetalheContrato(c)} className={`rounded-xl border shadow-sm transition-all cursor-pointer hover:shadow-md ${getStatusColor(c)}`}>
               {/* Header do Card */}
               <div className="p-5">
                 <div className="flex gap-4">
@@ -1991,6 +2109,70 @@ function G4Investimoveis(){
       </div>
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowFichaModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={gerarFichaVisitaPDF} className={`flex-1 ${btnGrad}`}>Gerar PDF ({fichaSelecionados.length})</button></div>
     </div></div>}
+
+    {/* ====== DETALHE DO CONTRATO (info + Documentos/Fotos/Contrato no Drive) ====== */}
+    {contratoDetalhe&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={()=>setContratoDetalhe(null)}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-auto max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">{contratoDetalhe.cliente}</h2>
+            <p className="text-sm text-gray-500">Código {contratoDetalhe.codigoRef||String(contratoDetalhe.id).padStart(3,'0')}</p>
+          </div>
+          <button onClick={()=>setContratoDetalhe(null)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"><Icons.X/></button>
+        </div>
+
+        <div className="overflow-y-auto">
+          {/* Resumo do contrato */}
+          <div className="p-5 border-b border-gray-200 grid grid-cols-2 gap-3 text-sm">
+            <div><span className="text-gray-500">Valor</span><p className="font-semibold text-green-600">{contratoDetalhe.valor||'R$ —'}</p></div>
+            <div><span className="text-gray-500">Tipo</span><p className="font-semibold text-gray-800">{contratoDetalhe.tipo} {contratoDetalhe.tipoImovel?`— ${contratoDetalhe.tipoImovel}`:''}</p></div>
+            <div className="col-span-2"><span className="text-gray-500">Endereço</span><p className="font-semibold text-gray-800">{contratoDetalhe.endereco||contratoDetalhe.imovel||'—'}</p></div>
+            <div><span className="text-gray-500">Início</span><p className="font-semibold text-gray-800">{fmtData(contratoDetalhe.dataInicio)}</p></div>
+            <div><span className="text-gray-500">Vencimento</span><p className="font-semibold text-gray-800">{fmtData(contratoDetalhe.dataVencimento)}</p></div>
+          </div>
+
+          {/* Google Drive: conectar */}
+          {!driveConectado&&(
+            <div className="p-5 border-b border-gray-200 text-center">
+              <p className="text-sm text-gray-600 mb-3">Conecte o Google Drive pra enviar e ver os arquivos desse contrato.</p>
+              <button onClick={conectarDrive} className={`px-5 py-2.5 ${btnGrad}`}>Conectar Google Drive</button>
+            </div>
+          )}
+
+          {driveConectado&&(<>
+            {/* Abas Documentos / Fotos / Contrato */}
+            <div className="flex border-b border-gray-200 px-5 pt-3 gap-1">
+              {[{k:'documentos',l:'Documentos'},{k:'fotos',l:'Fotos'},{k:'contrato',l:'Contrato'}].map(ab=>(
+                <button key={ab.k} onClick={()=>setDriveAbaAtiva(ab.k)} className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${driveAbaAtiva===ab.k?'border-red-500 text-red-600':'border-transparent text-gray-500 hover:text-gray-700'}`}>{ab.l}</button>
+              ))}
+            </div>
+
+            <div className="p-5">
+              <label className="block w-full text-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer font-medium text-gray-700 transition-colors mb-4">
+                {driveCarregando?'Enviando...':`Enviar arquivo pra "${driveAbaAtiva==='documentos'?'Documentos':driveAbaAtiva==='fotos'?'Fotos':'Contrato'}"`}
+                <input type="file" className="hidden" disabled={driveCarregando} onChange={e=>{if(e.target.files[0])enviarArquivoParaCategoria(driveAbaAtiva,e.target.files[0]);e.target.value='';}}/>
+              </label>
+
+              {driveCarregando&&driveArquivos[driveAbaAtiva].length===0&&<p className="text-center text-gray-400 py-6 text-sm">Carregando arquivos...</p>}
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {driveArquivos[driveAbaAtiva].map(f=>(
+                  <a key={f.id} href={f.webViewLink} target="_blank" rel="noopener noreferrer" className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow block">
+                    {f.thumbnailLink?(
+                      <img src={f.thumbnailLink} alt={f.name} className="w-full h-24 object-cover bg-gray-100"/>
+                    ):(
+                      <div className="w-full h-24 bg-gray-100 flex items-center justify-center"><Icons.FileText className="text-gray-400"/></div>
+                    )}
+                    <p className="text-xs text-gray-700 p-2 truncate" title={f.name}>{f.name}</p>
+                  </a>
+                ))}
+              </div>
+              {!driveCarregando&&driveArquivos[driveAbaAtiva].length===0&&<p className="text-center text-gray-400 py-6 text-sm">Nenhum arquivo enviado ainda nessa categoria.</p>}
+            </div>
+          </>)}
+        </div>
+      </div>
+    </div>}
 
     <footer className={`py-6 border-t no-print ${temaFundo==='escuro'?'border-gray-700 bg-transparent':'border-gray-200 bg-white'}`}><p className={`text-center text-sm ${temaFundo==='escuro'?'text-gray-300':'text-gray-500'}`}>© 2026 G4 Investimóveis - Sistema de Gestão</p></footer>
   </div>);
