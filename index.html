@@ -350,17 +350,23 @@ function G4Investimoveis(){
     reader.onerror=reject;
     reader.readAsDataURL(file);
   });
-  const enviarArquivoParaCategoria=async(categoria,file)=>{
-    if(!file||!contratoDetalhe)return;
+  const enviarArquivoParaCategoria=async(categoria,arquivos)=>{
+    const lista=Array.from(arquivos||[]);
+    if(lista.length===0||!contratoDetalhe)return;
     setDriveCarregando(true);
     try{
       const pastas=await chamarDrive({action:'ensureFolders',codigoRef:contratoDetalhe.codigoRef,cliente:contratoDetalhe.cliente});
-      const dataBase64=await arquivoParaBase64(file);
-      await chamarDrive({action:'upload',folderId:pastas[categoria],fileName:file.name,mimeType:file.type,dataBase64});
+      // Envia todos os arquivos ao mesmo tempo (em vez de um por vez) pra ficar bem mais rápido.
+      const resultados=await Promise.allSettled(lista.map(async(file)=>{
+        const dataBase64=await arquivoParaBase64(file);
+        return chamarDrive({action:'upload',folderId:pastas[categoria],fileName:file.name,mimeType:file.type,dataBase64});
+      }));
+      const falhas=resultados.filter(r=>r.status==='rejected');
+      if(falhas.length>0)alert(`${falhas.length} de ${lista.length} arquivo(s) falharam ao enviar. Tenta de novo com esses.`);
       await carregarArquivosContrato(contratoDetalhe);
     }catch(e){
       console.error(e);
-      alert('Erro ao enviar arquivo: '+e.message);
+      alert('Erro ao enviar arquivos: '+e.message);
     }finally{
       setDriveCarregando(false);
     }
@@ -2098,8 +2104,8 @@ function G4Investimoveis(){
 
             <div className="p-5">
               <label className="block w-full text-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer font-medium text-gray-700 transition-colors mb-4">
-                {driveCarregando?'Enviando...':`Enviar arquivo pra "${driveAbaAtiva==='documentos'?'Documentos':driveAbaAtiva==='fotos'?'Fotos':'Contrato'}"`}
-                <input type="file" className="hidden" disabled={driveCarregando} onChange={e=>{if(e.target.files[0])enviarArquivoParaCategoria(driveAbaAtiva,e.target.files[0]);e.target.value='';}}/>
+                {driveCarregando?'Enviando...':`Enviar arquivo(s) pra "${driveAbaAtiva==='documentos'?'Documentos':driveAbaAtiva==='fotos'?'Fotos':'Contrato'}" (pode escolher vários de uma vez)`}
+                <input type="file" multiple className="hidden" disabled={driveCarregando} onChange={e=>{enviarArquivoParaCategoria(driveAbaAtiva,e.target.files);e.target.value='';}}/>
               </label>
 
               {driveCarregando&&driveArquivos[driveAbaAtiva].length===0&&<p className="text-center text-gray-400 py-6 text-sm">Carregando arquivos...</p>}
