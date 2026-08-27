@@ -1215,13 +1215,13 @@ function G4Investimoveis(){
             </div>
           ))}
         </div>
-        {clientesFiltrados.length===0&&<div className="text-center py-16"><div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icons.Search/></div><p className="text-gray-600 text-lg">Nenhum cliente encontrado</p></div>}
+        {clientesFiltrados.length===0&&<div className="text-center py-16"><div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icons.Search/></div><p className={`text-lg ${temaFundo==='escuro'?'text-gray-200':'text-gray-600'}`}>Nenhum cliente encontrado</p></div>}
       </main>
     )}
     {/* ====== ABA EM ANDAMENTO ====== */}
     {abaAtiva==='emAndamento'&&!showGerador&&(
       <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Contratos em Andamento</h2>
+        <h2 className={`text-2xl font-bold mb-6 ${temaFundo==='escuro'?'text-white':'text-gray-800'}`}>Contratos em Andamento</h2>
 
         {/* Lista de Contratos em Andamento */}
         <div className="grid gap-4">
@@ -1320,8 +1320,8 @@ function G4Investimoveis(){
             <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
               <Icons.CheckCircle/>
             </div>
-            <p className="text-gray-600 text-lg">Nenhum contrato em andamento</p>
-            <p className="text-gray-500 text-sm mt-2">Todos os contratos estão completos!</p>
+            <p className={`text-lg ${temaFundo==='escuro'?'text-gray-200':'text-gray-600'}`}>Nenhum contrato em andamento</p>
+            <p className={`text-sm mt-2 ${temaFundo==='escuro'?'text-gray-400':'text-gray-500'}`}>Todos os contratos estão completos!</p>
           </div>
         )}
       </main>
@@ -1365,7 +1365,7 @@ function G4Investimoveis(){
         </div>
 
         {/* Lista de Contratos */}
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">{subAbaContrato==='ativos'?'Contratos Ativos':'Contratos Inativos'}</h2>
+        <h2 className={`text-2xl font-bold mb-6 ${temaFundo==='escuro'?'text-white':'text-gray-800'}`}>{subAbaContrato==='ativos'?'Contratos Ativos':'Contratos Inativos'}</h2>
 
         {/* Alternador Ativos / Inativos */}
         <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 mb-6 bg-white">
@@ -1483,7 +1483,7 @@ function G4Investimoveis(){
             </div>);
           })}
         </div>
-        {contratos.length===0&&<div className="text-center py-16"><p className="text-gray-400">Nenhum contrato cadastrado</p></div>}
+        {contratos.length===0&&<div className="text-center py-16"><p className={temaFundo==='escuro'?'text-gray-300':'text-gray-400'}>Nenhum contrato cadastrado</p></div>}
       </main>
     )}
 
@@ -1491,14 +1491,14 @@ function G4Investimoveis(){
     {abaAtiva==='visitas'&&(
       <main className="max-w-[1600px] mx-auto px-4 py-6 fade-in">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Icons.MapPin/>Visitas aos Imóveis</h2>
+          <h2 className={`text-2xl font-bold flex items-center gap-2 ${temaFundo==='escuro'?'text-white':'text-gray-800'}`}><Icons.MapPin/>Visitas aos Imóveis</h2>
           {imoveisParaRota.length>0&&(
             <a href={urlRotaVisitas} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm">
               <Icons.MapPin/>Ver rota no mapa ({imoveisParaRota.length})
             </a>
           )}
         </div>
-        <p className="text-sm text-gray-500 mb-6">Ordenado por prioridade: quem precisa de manutenção primeiro, depois quem está mais perto de completar 30 dias sem visita.</p>
+        <p className={`text-sm mb-6 ${temaFundo==='escuro'?'text-gray-300':'text-gray-500'}`}>Ordenado por prioridade: quem precisa de manutenção primeiro, depois quem está mais perto de completar 30 dias sem visita.</p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
@@ -1563,7 +1563,7 @@ function G4Investimoveis(){
                 </button>
               </div>
             </div>);
-          }):<div className="text-center py-16"><p className="text-gray-400">{buscaVisita?'Nenhum imóvel encontrado para essa busca.':'Nenhum imóvel ativo para visitar ainda.'}</p></div>}
+          }):<div className="text-center py-16"><p className={temaFundo==='escuro'?'text-gray-300':'text-gray-400'}>{buscaVisita?'Nenhum imóvel encontrado para essa busca.':'Nenhum imóvel ativo para visitar ainda.'}</p></div>}
         </div>
       </main>
     )}
@@ -1959,7 +1959,7 @@ function G4Investimoveis(){
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowFichaModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={gerarFichaVisitaPDF} className={`flex-1 ${btnGrad}`}>Gerar PDF ({fichaSelecionados.length})</button></div>
     </div></div>}
 
-    <footer className="py-6 border-t border-gray-200 bg-white no-print"><p className="text-center text-gray-500 text-sm">© 2026 G4 Investimóveis - Sistema de Gestão</p></footer>
+    <footer className={`py-6 border-t no-print ${temaFundo==='escuro'?'border-gray-700 bg-transparent':'border-gray-200 bg-white'}`}><p className={`text-center text-sm ${temaFundo==='escuro'?'text-gray-300':'text-gray-500'}`}>© 2026 G4 Investimóveis - Sistema de Gestão</p></footer>
   </div>);
 }
 ReactDOM.render(<G4Investimoveis/>,document.getElementById('root'));
