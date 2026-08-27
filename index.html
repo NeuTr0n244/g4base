@@ -323,23 +323,50 @@ function G4Investimoveis(){
   // Cada pessoa conecta a própria conta do Google (nada fica salvo pra outros usuários).
   // GOOGLE_DRIVE_CLIENT_ID precisa ser preenchido com o "OAuth 2.0 Client ID" (tipo
   // "Web application") criado no Google Cloud Console.
-  const conectarDrive=()=>{
-    if(!GOOGLE_DRIVE_CLIENT_ID){alert('O Google Drive ainda não foi configurado nesse site. Fale com quem cuida do sistema.');return;}
-    if(!window.google||!window.google.accounts){alert('Não consegui carregar o login do Google. Recarrega a página e tenta de novo.');return;}
+  const conectarDrive=(silencioso)=>{
+    if(!GOOGLE_DRIVE_CLIENT_ID){if(!silencioso)alert('O Google Drive ainda não foi configurado nesse site. Fale com quem cuida do sistema.');return;}
+    if(!window.google||!window.google.accounts){if(!silencioso)alert('Não consegui carregar o login do Google. Recarrega a página e tenta de novo.');return;}
     if(!driveTokenClientRef.current){
       driveTokenClientRef.current=google.accounts.oauth2.initTokenClient({
         client_id:GOOGLE_DRIVE_CLIENT_ID,
         scope:'https://www.googleapis.com/auth/drive.file',
         callback:(resp)=>{
-          if(resp.error){alert('Não consegui conectar ao Google Drive: '+resp.error);return;}
+          if(resp.error){
+            try{localStorage.removeItem('g4_drive_conectado');}catch(e){}
+            if(!silencioso)alert('Não consegui conectar ao Google Drive: '+resp.error);
+            return;
+          }
           driveTokenRef.current=resp.access_token;
           setDriveConectado(true);
-          if(contratoDetalhe)carregarArquivosContrato(contratoDetalhe);
+          try{localStorage.setItem('g4_drive_conectado','1');}catch(e){}
         },
       });
     }
-    driveTokenClientRef.current.requestAccessToken();
+    // "prompt:''" tenta renovar sem mostrar tela de login, aproveitando que o navegador já
+    // está logado no Google e já autorizou antes — só pede a tela de novo se isso falhar.
+    driveTokenClientRef.current.requestAccessToken(silencioso?{prompt:''}:{});
   };
+  // Ao abrir a página, se já tinha conectado o Drive antes nesse navegador, tenta reconectar
+  // sozinho (sem precisar clicar em "Conectar Google Drive" de novo).
+  useEffect(()=>{
+    let cancelado=false;
+    let tentativas=0;
+    const tentar=()=>{
+      if(cancelado)return;
+      let jaConectouAntes=false;
+      try{jaConectouAntes=localStorage.getItem('g4_drive_conectado')==='1';}catch(e){}
+      if(!jaConectouAntes)return;
+      if(window.google&&window.google.accounts){conectarDrive(true);return;}
+      if(tentativas<20){tentativas++;setTimeout(tentar,300);}
+    };
+    tentar();
+    return ()=>{cancelado=true;};
+  },[]);
+  // Se acabou de conectar (manual ou automático) enquanto já tinha um contrato aberto na tela,
+  // carrega os arquivos dele agora — evita ficar preso mostrando "Conectar Google Drive" vazio.
+  useEffect(()=>{
+    if(driveConectado&&contratoDetalhe)carregarArquivosContrato(contratoDetalhe);
+  },[driveConectado]);
   const driveFetch=async(url,opts={})=>{
     const res=await fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:`Bearer ${driveTokenRef.current}`}});
     if(!res.ok)throw new Error(`Drive API ${res.status}: ${await res.text()}`);
