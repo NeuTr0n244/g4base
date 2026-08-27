@@ -291,7 +291,7 @@ function G4Investimoveis(){
   const[tarefas,setTarefas]=useState([]);
   const[showTarefaModal,setShowTarefaModal]=useState(false);
   const[editingTarefa,setEditingTarefa]=useState(null);
-  const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:''});
+  const[novaTarefa,setNovaTarefa]=useState({titulo:'',descricao:'',data:'',hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:'',adiarAutomatico:true});
   const[diaSelecionado,setDiaSelecionado]=useState(null);
   const[visaoCalendario,setVisaoCalendario]=useState('grade');
   const[semanaOffset,setSemanaOffset]=useState(0);
@@ -491,7 +491,7 @@ function G4Investimoveis(){
   const tarefasPendentes=useMemo(()=>tarefas.filter(t=>!t.concluida).length,[tarefas]);
   const mesAnterior=()=>{if(mesAtual===0){setMesAtual(11);setAnoAtual(anoAtual-1);}else setMesAtual(mesAtual-1);};
   const mesSeguinte=()=>{if(mesAtual===11){setMesAtual(0);setAnoAtual(anoAtual+1);}else setMesAtual(mesAtual+1);};
-  const abrirNovaTarefa=(dia)=>{const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';setNovaTarefa({titulo:'',descricao:'',data:ds,hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:''});setEditingTarefa(null);setShowTarefaModal(true);};
+  const abrirNovaTarefa=(dia)=>{const ds=dia?`${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`:'';setNovaTarefa({titulo:'',descricao:'',data:ds,hora:'',prioridade:'media',concluida:false,repetir:false,dataFinal:'',adiarAutomatico:true});setEditingTarefa(null);setShowTarefaModal(true);};
   const handleAddTarefa=async()=>{
     if(!novaTarefa.titulo||!novaTarefa.data)return;
     if(novaTarefa.repetir&&novaTarefa.dataFinal&&!editingTarefa){
@@ -512,7 +512,7 @@ function G4Investimoveis(){
     setShowTarefaModal(false);setEditingTarefa(null);
   };
   const toggleConcluida=async(id)=>{const t=tarefas.find(x=>x.id===id);if(!t)return;await fsAdd('tarefas',{...t,concluida:!t.concluida});};
-  const editarTarefa=(t)=>{setEditingTarefa(t);setNovaTarefa(t);setShowTarefaModal(true);};
+  const editarTarefa=(t)=>{setEditingTarefa(t);setNovaTarefa({...t,adiarAutomatico:t.adiarAutomatico!==false});setShowTarefaModal(true);};
   const deletarTarefa=async(id)=>{if(confirm('Excluir?')){const t=tarefas.find(x=>x.id===id);if(t)await fsDel('tarefas',t._docId||String(t.id));}};
   const getPC=(p)=>p==='alta'?'bg-red-500':p==='media'?'bg-amber-500':'bg-green-500';
   const getPL=(p)=>p==='alta'?'Alta':p==='media'?'Média':'Baixa';
@@ -890,6 +890,28 @@ function G4Investimoveis(){
       });
     }
   },[imoveisAtrasadosVisita,imoveisParaVisitar]);
+
+  // Adia automaticamente tarefas não concluídas (com "Adiar automaticamente" ativado, que é o
+  // padrão) pro dia seguinte, assim que passar das 18h sem terem sido concluídas — não cria
+  // tarefa nova, só troca a data da mesma. Confere ao carregar e depois a cada 15 minutos.
+  useEffect(()=>{
+    const verificarAdiamento=()=>{
+      const agora=new Date();
+      const passouDas18h=agora.getHours()>=18;
+      const hojeStrAtual=`${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}`;
+      const amanha=new Date(agora);amanha.setDate(amanha.getDate()+1);
+      const amanhaStr=`${amanha.getFullYear()}-${String(amanha.getMonth()+1).padStart(2,'0')}-${String(amanha.getDate()).padStart(2,'0')}`;
+      tarefas.forEach(t=>{
+        if(t.concluida||t.adiarAutomatico===false||!t.data)return;
+        const estaAtrasada=t.data<hojeStrAtual||(t.data===hojeStrAtual&&passouDas18h);
+        if(!estaAtrasada||t.data===amanhaStr)return;
+        fsAdd('tarefas',{...t,data:amanhaStr});
+      });
+    };
+    verificarAdiamento();
+    const intervalo=setInterval(verificarAdiamento,15*60*1000);
+    return ()=>clearInterval(intervalo);
+  },[tarefas]);
 
   const toggleChecklistItem=async(contrato,index)=>{
     const cl=[...(contrato.checklist||[false,false,false,false,false,false,false,false,false])];
@@ -1877,6 +1899,17 @@ function G4Investimoveis(){
             </div>
           )}
         </div>}
+        <div className="border-t border-gray-200 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Adiar automaticamente</label>
+              <p className="text-xs text-gray-500">Se não for concluída até 18h, pula sozinha pro dia seguinte (não cria outra, só muda a data)</p>
+            </div>
+            <button type="button" onClick={()=>setNovaTarefa({...novaTarefa,adiarAutomatico:!(novaTarefa.adiarAutomatico!==false)})} className={`shrink-0 w-12 h-7 rounded-full transition-colors relative ${novaTarefa.adiarAutomatico!==false?'bg-green-500':'bg-gray-300'}`}>
+              <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${novaTarefa.adiarAutomatico!==false?'left-6':'left-1'}`}></span>
+            </button>
+          </div>
+        </div>
       </div>
       <div className="flex gap-3 p-5 border-t border-gray-200"><button onClick={()=>setShowTarefaModal(false)} className="flex-1 px-5 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Cancelar</button><button onClick={handleAddTarefa} className={`flex-1 ${btnGrad}`}>{editingTarefa?'Salvar':'Adicionar'}</button></div>
     </div></div>}
