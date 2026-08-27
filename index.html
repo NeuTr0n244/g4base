@@ -237,6 +237,29 @@ function G4Investimoveis(){
 
   const[loading,setLoading]=useState(true);
   const[syncStatus,setSyncStatus]=useState('');
+  // Fundo personalizado: fica salvo só no navegador de quem escolheu (localStorage), nunca
+  // sincroniza com o Firebase — cada pessoa que acessa o site pode ter o seu próprio, sem
+  // aparecer pra ninguém mais.
+  const[fundoImagem,setFundoImagem]=useState(()=>{
+    try{return localStorage.getItem('g4_fundo_imagem')||'';}catch(e){return '';}
+  });
+  const[showFundoModal,setShowFundoModal]=useState(false);
+  const escolherFundo=(file)=>{
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      const base64=e.target.result;
+      try{localStorage.setItem('g4_fundo_imagem',base64);}catch(err){alert('Não consegui salvar essa imagem (muito grande pra caber no navegador). Tenta uma foto menor.');return;}
+      setFundoImagem(base64);
+      setShowFundoModal(false);
+    };
+    reader.readAsDataURL(file);
+  };
+  const removerFundo=()=>{
+    try{localStorage.removeItem('g4_fundo_imagem');}catch(e){}
+    setFundoImagem('');
+    setShowFundoModal(false);
+  };
   const loadedRef=React.useRef(false);
 
   const[abaAtiva,setAbaAtiva]=useState('home');
@@ -953,7 +976,29 @@ function G4Investimoveis(){
   );
 
   return(
-  <div className="min-h-screen bg-gray-100">
+  <div
+    className="min-h-screen"
+    style={fundoImagem
+      ? {backgroundImage:`url(${fundoImagem})`,backgroundSize:'cover',backgroundPosition:'center',backgroundAttachment:'fixed'}
+      : {backgroundColor:'#3a3f47'}
+    }
+  >
+    {/* Botão flutuante: trocar fundo (só afeta esse navegador, não sincroniza com ninguém) */}
+    <button onClick={()=>setShowFundoModal(true)} title="Trocar fundo (só neste computador)" className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-800 text-white shadow-lg flex items-center justify-center backdrop-blur-sm transition-colors">
+      <Icons.Camera/>
+    </button>
+    {showFundoModal&&<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={()=>setShowFundoModal(false)}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5" onClick={e=>e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-gray-800 mb-1">Fundo da tela</h2>
+        <p className="text-xs text-gray-500 mb-4">Só muda pra você, nesse computador/navegador — ninguém mais vê essa foto.</p>
+        <label className="block w-full text-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer font-medium text-gray-700 transition-colors mb-3">
+          Escolher foto do computador
+          <input type="file" accept="image/*" className="hidden" onChange={e=>escolherFundo(e.target.files[0])}/>
+        </label>
+        {fundoImagem&&<button onClick={removerFundo} className="w-full px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-medium transition-colors mb-3">Remover foto (voltar pro cinza escuro)</button>}
+        <button onClick={()=>setShowFundoModal(false)} className="w-full px-4 py-2 text-gray-500 text-sm hover:text-gray-700">Fechar</button>
+      </div>
+    </div>}
     {/* SYNC STATUS */}
     {syncStatus&&<div className={`fixed top-2 right-2 z-50 px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg transition-all ${syncStatus.startsWith('✓')?'bg-green-500 text-white':syncStatus.startsWith('❌')?'bg-red-600 text-white':syncStatus.startsWith('⚠')?'bg-yellow-500 text-white':'bg-blue-500 text-white'}`}>{syncStatus}</div>}
     {/* HEADER */}
