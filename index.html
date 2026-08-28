@@ -323,6 +323,8 @@ function G4Investimoveis(){
   const[driveCarregando,setDriveCarregando]=useState(false);
   const[driveArquivos,setDriveArquivos]=useState({documentos:[],fotos:[],contrato:[]});
   const[drivePastaId,setDrivePastaId]=useState('');
+  const[imovelSite,setImovelSite]=useState(null);
+  const[imovelSiteCarregando,setImovelSiteCarregando]=useState(false);
 
   // ===== Integração Google Drive (Documentos/Fotos/Contrato de cada contrato) =====
   // Passa por /api/drive.js, que guarda uma autorização única e permanente (configurada
@@ -351,12 +353,43 @@ function G4Investimoveis(){
       setDriveCarregando(false);
     }
   };
+  // Busca os dados completos do imóvel no site público (cômodos, metragem, fotos) pelo código
+  // de referência — consulta filtrada (runQuery), não baixa a coleção inteira, pra economizar cota.
+  const buscarImovelDoSite=async(ref)=>{
+    if(!ref)return null;
+    try{
+      const res=await fetch('https://firestore.googleapis.com/v1/projects/g4-investimoveis/databases/(default)/documents:runQuery',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({structuredQuery:{from:[{collectionId:'properties'}],where:{fieldFilter:{field:{fieldPath:'reference'},op:'EQUAL',value:{stringValue:String(ref)}}},limit:1}})
+      });
+      const data=await res.json();
+      const doc=(Array.isArray(data)?data:[]).map(r=>r.document).find(Boolean);
+      if(!doc)return null;
+      const f=doc.fields||{};
+      const val=(v)=>{if(!v)return null;if(v.stringValue!==undefined)return v.stringValue;if(v.integerValue!==undefined)return Number(v.integerValue);if(v.doubleValue!==undefined)return v.doubleValue;if(v.booleanValue!==undefined)return v.booleanValue;return null;};
+      const arr=(v)=>{if(!v||!v.arrayValue||!v.arrayValue.values)return[];return v.arrayValue.values.map(x=>x.stringValue).filter(Boolean);};
+      return{
+        endereco:montarEnderecoSite({address:val(f.address),number:val(f.number),neighborhood:val(f.neighborhood),city:val(f.city)}),
+        comodos:montarComodos({bedrooms:val(f.bedrooms),suites:val(f.suites),bathrooms:val(f.bathrooms),garages:val(f.garages)}),
+        metragem:montarMetragem({builtArea:val(f.builtArea),area:val(f.area)}),
+        descricao:val(f.description)||'',
+        imagens:arr(f.images),
+      };
+    }catch(e){
+      console.error('Erro ao buscar imóvel do site público:',e);
+      return null;
+    }
+  };
   const abrirDetalheContrato=async(c)=>{
     setContratoDetalhe(c);
     setDriveAbaAtiva('documentos');
     setDriveArquivos({documentos:[],fotos:[],contrato:[]});
     setDrivePastaId('');
-    await carregarArquivosContrato(c);
+    setImovelSite(null);
+    setImovelSiteCarregando(true);
+    carregarArquivosContrato(c);
+    buscarImovelDoSite(c.codigoRef).then(setImovelSite).finally(()=>setImovelSiteCarregando(false));
   };
   const arquivoParaBase64=(file)=>new Promise((resolve,reject)=>{
     const reader=new FileReader();
@@ -2098,13 +2131,25 @@ function G4Investimoveis(){
         </div>
 
         <div className="overflow-y-auto">
+          {/* Fotos do imóvel (puxadas do site público pela Ref.) */}
+          {(imovelSite?.imagens?.length>0||contratoDetalhe.imagemUrl)&&(
+            <div className="flex gap-2 overflow-x-auto p-4 pb-2 bg-gray-50 border-b border-gray-200">
+              {(imovelSite?.imagens?.length>0?imovelSite.imagens:[contratoDetalhe.imagemUrl]).map((url,i)=>(
+                <img key={i} src={url} alt={`Foto ${i+1}`} className="h-32 w-auto rounded-xl object-cover shrink-0 border border-gray-200 shadow-sm"/>
+              ))}
+            </div>
+          )}
+          {imovelSiteCarregando&&<div className="px-5 pt-3 text-xs text-gray-400">Buscando dados do imóvel no site público...</div>}
           {/* Resumo do contrato */}
           <div className="p-5 border-b border-gray-200 grid grid-cols-2 gap-3 text-sm">
             <div><span className="text-gray-500">Valor</span><p className="font-semibold text-green-600">{contratoDetalhe.valor||'R$ —'}</p></div>
             <div><span className="text-gray-500">Tipo</span><p className="font-semibold text-gray-800">{contratoDetalhe.tipo} {contratoDetalhe.tipoImovel?`— ${contratoDetalhe.tipoImovel}`:''}</p></div>
-            <div className="col-span-2"><span className="text-gray-500">Endereço</span><p className="font-semibold text-gray-800">{contratoDetalhe.endereco||contratoDetalhe.imovel||'—'}</p></div>
+            <div className="col-span-2"><span className="text-gray-500">Endereço</span><p className="font-semibold text-gray-800">{imovelSite?.endereco||contratoDetalhe.endereco||contratoDetalhe.imovel||'—'}</p></div>
+            {imovelSite?.comodos&&<div><span className="text-gray-500">Cômodos</span><p className="font-semibold text-gray-800">{imovelSite.comodos}</p></div>}
+            {imovelSite?.metragem&&<div><span className="text-gray-500">Metragem</span><p className="font-semibold text-gray-800">{imovelSite.metragem}</p></div>}
             <div><span className="text-gray-500">Início</span><p className="font-semibold text-gray-800">{fmtData(contratoDetalhe.dataInicio)}</p></div>
             <div><span className="text-gray-500">Vencimento</span><p className="font-semibold text-gray-800">{fmtData(contratoDetalhe.dataVencimento)}</p></div>
+            {imovelSite?.descricao&&<div className="col-span-2"><span className="text-gray-500">Descrição</span><p className="font-semibold text-gray-800">{imovelSite.descricao}</p></div>}
           </div>
 
           <>
