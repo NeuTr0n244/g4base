@@ -648,8 +648,8 @@ function G4Investimoveis(){
   // CONTRATOS funcs
   const diasRestantes=(dataVenc)=>{const hj=new Date();hj.setHours(0,0,0,0);const v=new Date(dataVenc+'T00:00:00');return Math.ceil((v-hj)/(1000*60*60*24));};
 
-  const contratosVencendo=useMemo(()=>contratos.filter(c=>c.status==='ativo'&&diasRestantes(c.dataVencimento)<=30&&diasRestantes(c.dataVencimento)>0),[contratos]);
-  const contratosVencidos=useMemo(()=>contratos.filter(c=>c.status==='ativo'&&diasRestantes(c.dataVencimento)<=0),[contratos]);
+  const contratosVencendo=useMemo(()=>contratos.filter(c=>c.status==='ativo'&&!c.inativoNoSite&&diasRestantes(c.dataVencimento)<=30&&diasRestantes(c.dataVencimento)>0),[contratos]);
+  const contratosVencidos=useMemo(()=>contratos.filter(c=>c.status==='ativo'&&!c.inativoNoSite&&diasRestantes(c.dataVencimento)<=0),[contratos]);
 
   const totalNotifs=tarefasPendentes+contratosVencendo.length+contratosVencidos.length;
 
@@ -702,7 +702,7 @@ function G4Investimoveis(){
     return diasDesdeVisita(b)-diasDesdeVisita(a);
   };
   const imoveisParaVisitar=useMemo(()=>contratos
-    .filter(c=>c.status==='ativo'&&getChecklistProgress(c).isCompleto)
+    .filter(c=>c.status==='ativo'&&!c.inativoNoSite&&getChecklistProgress(c).isCompleto)
     .sort(ordenarPorPrioridadeVisita),[contratos]);
   const imoveisAtrasadosVisita=useMemo(()=>imoveisParaVisitar
     .filter(c=>diasDesdeVisita(c)>=30),[imoveisParaVisitar]);
@@ -1501,7 +1501,7 @@ function G4Investimoveis(){
           </div>
           <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
             <p className="text-gray-500 text-sm">Ativos</p>
-            <p className="text-2xl font-bold text-green-600">{contratos.filter(c=>c.status==='ativo'&&diasRestantes(c.dataVencimento)>0).length}</p>
+            <p className="text-2xl font-bold text-green-600">{contratos.filter(c=>c.status==='ativo'&&!c.inativoNoSite&&diasRestantes(c.dataVencimento)>0).length}</p>
           </div>
           <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
             <p className="text-gray-500 text-sm">Vencendo (30d)</p>
